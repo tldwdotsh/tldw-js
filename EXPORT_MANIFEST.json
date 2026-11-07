@@ -50,9 +50,9 @@
     "tests/cli.test.mjs": "49e470c7b7713482a5c3c88d8e7eddc91f03e006876af597a554446fe4109e67",
     "tests/client.test.mjs": "84266a7b2baef51cd522e3989582a68271c0523d94d6264ee8f14f114338379c"
   },
-  "export_snapshot_sha256": "024315abb605de8f3b942473eeb8d9da6998ff44fcb9a3428973ee8b053f76c2",
+  "export_snapshot_sha256": "ca97f999c5d068b3b74eba6b9429506717385e618bf2591bdd2cddba15a74bc5",
   "export_files": {
-    ".github/workflows/validate.yml": "68ab83e407aa89df33b4b2a541f3ccc3f42c26400e5ce0576b898eebd8298eda",
+    ".github/workflows/validate.yml": "bb3e088f562fbfb8df9bd49c90fea3cca2cb970a3ef1423e19c111cfdfa3c37e",
     ".gitignore": "2682bd7572b68987632de8f3e52a5993dc1f5732e87d64c6582bd7a8b0184b7f",
     "LICENSE": "66c5c642314847f06544018eb8224259f5eabf17ed2a5c04c4f28e7f1f684821",
     "README.md": "e9d25bf70e25d7ff1867ab6c96ad9709ba10c6ad462c6a7adc2031f70db483cd",

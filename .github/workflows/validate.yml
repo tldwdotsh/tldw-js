@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python3 plugin/scripts/validate.py --allow-placeholder-endpoint
-      - run: python3 -m unittest discover -s plugin/examples/grok/tests -v
+      - run: python3 -B -m unittest discover -s plugin/examples/grok/tests -v
       - run: npm ci --offline --ignore-scripts --no-audit --no-fund
       - run: npm test
       - run: npm run build
