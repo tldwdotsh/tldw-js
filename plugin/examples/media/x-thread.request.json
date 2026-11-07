@@ -1,0 +1,8 @@
+{
+  "media": {
+    "type": "x",
+    "url": "https://x.com/USER/status/POST_ID",
+    "scope": "thread"
+  },
+  "instructions": "Find the central claim and the most interesting supporting details. Cite the source and flag gaps."
+}

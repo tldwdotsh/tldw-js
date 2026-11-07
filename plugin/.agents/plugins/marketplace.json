@@ -1,0 +1,20 @@
+{
+  "name": "tldw",
+  "interface": {
+    "displayName": "tldw.sh agent integrations"
+  },
+  "plugins": [
+    {
+      "name": "tldw",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

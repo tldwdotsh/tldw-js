@@ -1,0 +1,10 @@
+{
+  "name": "tldw",
+  "version": "0.8.0",
+  "description": "Analyze text, X posts and articles, YouTube and TikTok with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
+  "author": {
+    "name": "tldw.sh contributors"
+  },
+  "license": "MIT",
+  "keywords": ["media", "summaries", "analysis", "transcripts", "mcp", "tldw"]
+}

@@ -1,0 +1,8 @@
+# Merge this table into your chosen Codex config; do not replace unrelated settings.
+# Replace the reserved .invalid endpoint with your operator's real MCP URL.
+[mcp_servers.tldw]
+url = "https://api.tldw.invalid/mcp"
+bearer_token_env_var = "TLDW_API_TOKEN"
+
+# This direct-MCP alternative is unnecessary when the plugin already supplies
+# a working tldw server. Avoid configuring duplicate connections.

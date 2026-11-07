@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tldw": {
+      "url": "https://api.tldw.invalid/mcp",
+      "bearer_token_env_var": "TLDW_API_TOKEN"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "@tldw/client",
+  "version": "0.2.0",
+  "description": "Dependency-free tldw.sh async analysis client and agent setup tools",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://tldw.sh/agents",
+  "keywords": [
+    "tldw",
+    "video",
+    "analysis",
+    "agents",
+    "mcp",
+    "async",
+    "api"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.mjs"
+    }
+  },
+  "bin": {
+    "tldw": "./bin/tldw.mjs"
+  },
+  "files": [
+    "src",
+    "bin",
+    "plugin",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tldwdotsh/tldw-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tldwdotsh/tldw-js/issues"
+  }
+}

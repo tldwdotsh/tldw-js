@@ -1,0 +1,8 @@
+{
+  "media": {
+    "type": "text",
+    "title": "Product research notes",
+    "text": "People want a concise answer from source material. They also need to see which claims are supported and where the source is incomplete."
+  },
+  "instructions": "Extract the product opportunities. Cite the source and separate observations from assumptions."
+}

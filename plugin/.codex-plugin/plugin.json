@@ -1,0 +1,16 @@
+{
+  "name": "tldw",
+  "version": "0.8.0",
+  "description": "Analyze text, X posts and articles, YouTube and TikTok with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
+  "author": {
+    "name": "tldw.sh contributors"
+  },
+  "license": "MIT",
+  "skills": "./skills/",
+  "mcpServers": "./codex.mcp.json",
+  "interface": {
+    "displayName": "tldw.sh",
+    "shortDescription": "Too long; didn't watch. Media analysis for agents.",
+    "brandColor": "#FF4D00"
+  }
+}
