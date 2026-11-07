@@ -244,10 +244,6 @@ function spendingOptions({ transcription, maxCredits, forceAsr } = {}) {
     throw new TypeError("forceAsr must be a boolean.");
   if (forceAsr && transcription !== "if_needed")
     throw new TypeError("forceAsr requires explicit transcription=if_needed.");
-  if (transcription === "if_needed" && maxCredits === undefined)
-    throw new TypeError(
-      "transcription=if_needed requires an explicit maxCredits ceiling.",
-    );
   let cap;
   if (maxCredits !== undefined) {
     if (!["number", "string"].includes(typeof maxCredits))

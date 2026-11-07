@@ -1,5 +1,6 @@
 export type Media = string | Record<string, unknown>;
 export interface JobCredits {
+  billing_exempt?: boolean;
   estimated: number | string | null;
   reserved: number | string;
   final: number | string | null;
@@ -81,7 +82,7 @@ export interface SubmitOptions {
   transcription?: "never" | "if_needed";
   /** Decimal credit ceiling; aggregate fixed-share ceiling for comparisons. */
   maxCredits?: number | string;
-  /** Requires explicit transcription=if_needed and an eligible paid plan. */
+  /** Requires explicit transcription=if_needed and server-authorized ASR access. */
   forceAsr?: boolean;
 }
 export interface WaitOptions<T = Job> {

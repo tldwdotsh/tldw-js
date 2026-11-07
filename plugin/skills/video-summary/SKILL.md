@@ -83,14 +83,14 @@ already completed clips retain normal usage when a comparison is canceled.
 
 New Free accounts verify once in the signed-in browser, then use their key
 headlessly. Free includes 500 monthly caption/text credits; Hobby includes 1,000 for
-USD20/month and Pro includes 5,000 for USD100/month. All clients share account
+USD20/month and Pro includes 5,000 for USD99/month. All clients share account
 usage. Included allowance is used before non-expiring purchased credits.
 
 Default `transcription="never"` uses captions/text or existing cached transcripts
 at 1 credit per source minute. Fresh ASR costs 3 credits per minute and requires
-explicit `transcription="if_needed"` plus an eligible paid plan. Do not silently
+explicit `transcription="if_needed"` plus an eligible paid plan or server-confirmed billing exemption. Do not silently
 enable it after a caption-only failure. Bound authorized spending with
-`max_credits` (required with `if_needed`); comparisons/batches split that aggregate ceiling equally across
+`max_credits` (required with `if_needed` for ordinary paid accounts); comparisons/batches split that aggregate ceiling equally across
 distinct clips, round down to 0.01 credit and never redistribute unused shares.
 Review `job.credits` for estimated, reserved and final amounts. Failed/canceled
 jobs release reservations; completed clips retain their charges. Polling and
@@ -101,3 +101,6 @@ accounts to evade usage limits.
 
 For the full 29-tool scope map and request examples, read
 [tool scopes and workflow boundaries](references/tools.md).
+
+
+Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `MAX_CREDITS_EXCEEDED` (HTTP 422). Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.

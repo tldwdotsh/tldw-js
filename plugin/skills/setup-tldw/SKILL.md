@@ -82,3 +82,6 @@ authorized summary or comparison test, preserve custom instructions, a stable
 idempotency key and the returned job/comparison ID. analyze_media is always
 asynchronous; get_job reports progress, and get_summary returns successful output.
 Legacy optional bounded waits do not cancel processing when their wait ends.
+
+
+Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `MAX_CREDITS_EXCEEDED` (HTTP 422). Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.

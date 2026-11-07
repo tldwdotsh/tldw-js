@@ -28,14 +28,14 @@ private workflow. Public summary responses omit the brief, while shared
 result content can still reflect it.
 
 New Free users verify once in the browser. Free includes 500 monthly caption/text credits; Hobby includes 1,000 for
-USD20/month and Pro includes 5,000 for USD100/month. All clients share account
+USD20/month and Pro includes 5,000 for USD99/month. All clients share account
 usage. Included allowance is used before non-expiring purchased credits.
 
 Default `transcription="never"` uses captions/text or existing cached transcripts
 at 1 credit per source minute. Fresh ASR costs 3 credits per minute and requires
-explicit `transcription="if_needed"` plus an eligible paid plan. Do not silently
+explicit `transcription="if_needed"` plus an eligible paid plan or server-confirmed billing exemption. Do not silently
 enable it after a caption-only failure. Bound authorized spending with
-`max_credits` (required with `if_needed`); comparisons/batches split that aggregate ceiling equally across
+`max_credits` (required with `if_needed` for ordinary paid accounts); comparisons/batches split that aggregate ceiling equally across
 distinct clips, round down to 0.01 credit and never redistribute unused shares.
 Review `job.credits` for estimated, reserved and final amounts. Failed/canceled
 jobs release reservations; completed clips retain their charges. Polling and
@@ -166,3 +166,6 @@ transcripts and the custom brief. A ticket requests human support; it does not
 imply a person has replied.
 API keys cannot manage billing, credentials, account deletion or staff.
 Use the signed-in app for those actions; plugins cannot upgrade their permissions.
+
+
+Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `MAX_CREDITS_EXCEEDED` (HTTP 422). Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.

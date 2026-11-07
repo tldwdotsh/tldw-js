@@ -408,3 +408,17 @@ test("comparison forwards one aggregate cap without multiplying it by URL count"
   assert.equal(body.max_credits, "10");
   assert.equal(body.transcription, "if_needed");
 });
+test("omitted transcription caps reach the authenticated server without an account lookup", async () => {
+  const calls = [];
+  const client = make(async (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return response(receipt(), 202); });
+  await client.submitAnalysis("source", { transcription: "if_needed" });
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].url.endsWith("/v1/analyses"));
+  assert.deepEqual(calls[0].body, { media: "source", transcription: "if_needed" });
+});
+test("ordinary account missing-cap policy errors remain actionable and are not retried", async () => {
+  let calls = 0;
+  const client = make(async () => { calls++; return response({ error: { code: "MAX_CREDITS_EXCEEDED", message: "A credit ceiling is required." } }, 422); });
+  await assert.rejects(client.submitAnalysis("source", { transcription: "if_needed" }), (error) => error.code === "MAX_CREDITS_EXCEEDED" && error.status === 422);
+  assert.equal(calls, 1);
+});

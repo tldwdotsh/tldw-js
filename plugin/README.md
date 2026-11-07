@@ -1,4 +1,4 @@
-# tldw.sh agent plugin · 0.8.0
+# tldw.sh agent plugin · 0.8.1
 
 **Too long; didn't watch.** Connect with a scoped tldw.sh API key from any HTTP
 client, script or agent.
@@ -41,13 +41,13 @@ repository does not deploy or verify that hosted service.
 ## Prepare the plugin with the CLI
 
 Open your operator's **Connect your agent** page (`/agents`) for the exact install
-command and download origin. The downloadable `tldw-client-0.2.0.tgz` contains a
+command and download origin. The downloadable `tldw-client-0.2.1.tgz` contains a
 dependency-free Node client, CLI and this reviewed plugin. It is a real package
 download; a public npm registry listing is not required.
 
 ```sh
 # Use the exact HTTPS app/API origins shown in your account. Do not put keys in flags.
-npx --yes 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.0.tgz' init \
+npx --yes 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.1.tgz' init \
   --api-url 'https://YOUR_API_ORIGIN' --web-url 'https://YOUR_APP_ORIGIN' \
   --dir ./tldw-agent-plugin
 ```
@@ -89,7 +89,7 @@ its reserved `.invalid` origin before installing an unconfigured source copy.
 `TLDW_API_TOKEN` is read at runtime; it is never baked into this package.
 Restart a client launched before you configured its environment.
 
-Version 0.8.0 adds explicit transcription consent and credit ceilings, with
+Version 0.8.1 adds explicit transcription consent and credit ceilings, with
 monthly Free/Hobby/Pro allowances. Version 0.7.0 introduced a dedicated Cursor manifest/configuration while retaining
 plugin/marketplace name `tldw` and the `TLDW_*` environment variables.
 Existing SaaS API keys remain valid, including the legacy `yta_`
@@ -244,14 +244,14 @@ non-expiring purchased credits. The plugin cannot purchase credits or bypass
 length, concurrency or rate limits. Token revocation in the app disables access.
 
 Free includes 500 monthly caption/text credits; Hobby includes 1,000 for
-USD20/month and Pro includes 5,000 for USD100/month. All clients share account
+USD20/month and Pro includes 5,000 for USD99/month. All clients share account
 usage. Included allowance is used before non-expiring purchased credits.
 
 Default `transcription="never"` uses captions/text or existing cached transcripts
 at 1 credit per source minute. Fresh ASR costs 3 credits per minute and requires
-explicit `transcription="if_needed"` plus an eligible paid plan. Do not silently
+explicit `transcription="if_needed"` plus an eligible paid plan or server-confirmed billing exemption. Do not silently
 enable it after a caption-only failure. Bound authorized spending with
-`max_credits` (required with `if_needed`); comparisons/batches split that aggregate ceiling equally across
+`max_credits` (required with `if_needed` for ordinary paid accounts); comparisons/batches split that aggregate ceiling equally across
 distinct clips, round down to 0.01 credit and never redistribute unused shares.
 Review `job.credits` for estimated, reserved and final amounts. Failed/canceled
 jobs release reservations; completed clips retain their charges. Polling and
@@ -356,3 +356,6 @@ It does not license the separately operated SaaS or waive subscription terms.
 - [Cursor plugin manifests and variables](https://cursor.com/docs/reference/plugins)
 - [Cursor local plugin testing](https://cursor.com/docs/plugins#test-plugins-locally)
 - [Cursor MCP environment variables](https://cursor.com/docs/mcp#variables)
+
+
+Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `MAX_CREDITS_EXCEEDED` (HTTP 422). Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.

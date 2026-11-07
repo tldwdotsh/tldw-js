@@ -9,14 +9,14 @@
   "sha256": {
     ".agents/plugins/marketplace.json": "f9ea26360f0f4267fb76fe1f5c08549c4d6669faf5e75b4e31049dc34df06c15",
     ".claude-plugin/marketplace.json": "a0ec8699c8402cd75e3f38a8cc89a25cd3edaa4fec942551d295d351263a7bd1",
-    ".claude-plugin/plugin.json": "16cb47204286d0fda72f58df821d2a21deff7c962b18adcf38db063bc10ef39f",
-    ".codex-plugin/plugin.json": "7fc1d17ea685ad08183886f93166e3813c842c21217b24e1b6680a6cfedb367a",
-    ".cursor-plugin/plugin.json": "161200e75f1c16b90ce9b191b68676d58c116b14bc852307a6e7860c7ba3d281",
+    ".claude-plugin/plugin.json": "c59a8ab6fa329f505e599df9fb8874488909c585d778714172141dcfd32bdfef",
+    ".codex-plugin/plugin.json": "0a407184d769b873b796b5bb9021c9d01077665f6f8407307e265c419ed6a271",
+    ".cursor-plugin/plugin.json": "d94d890a4c7ab236adef574729dd56da0463bf111a446d46b84dfce19fe904d0",
     ".github/workflows/validate.yml": "63c656d53d073fd24628dd30afb91df3a53b32df160c32e47ef079c2281ae5cd",
     ".gitignore": "dbf3caac707346a9fc2d11537a977c829a6cf18baa2666e301a1829a557d14ce",
     ".mcp.json": "9bf1387df3523238fab85cc50e66f378c5c6485f82fb318d14a55f08daafcb6a",
     "LICENSE": "66c5c642314847f06544018eb8224259f5eabf17ed2a5c04c4f28e7f1f684821",
-    "README.md": "c375ac3a893e889c3eafc69685f0b510caab872b1737bffc0b608faf19d6f763",
+    "README.md": "0a8387c7f03b479f79a7cfc4a4fba1f4cce1ef00fbd7a5a3c28c99d1b18cab1a",
     "codex.mcp.json": "109826cccbbb7ed8112d1e47ca7db7911278302979339936ace1622cf163da18",
     "cursor.mcp.json": "4ffad443c12ca9b60a1791c318057e91890521abe445ad46eb69fde974879a4d",
     "examples/codex/config.toml": "b9b4982bf62a6c74100a8cbe23e74e34fbe16371e66eae8b328586dd28968e49",
@@ -29,11 +29,11 @@
     "examples/media/text.request.json": "a71ca35338ed4f8f167cf43053de200fa047af29ec5c161fade4a4adb45f61c9",
     "examples/media/x-thread.request.json": "3a591f779c9699e10723eb16dc05a4d98d51f2e5a0c756d36d8c90fb7d7b7c7d",
     "scripts/validate.py": "8fe9c9d8c4c9d0e948aab9e97f0d364a651b5c85d381e908d263f1ae6030866b",
-    "skills/setup-tldw/SKILL.md": "7486f42e090480e3f13d810477b51863b94309035c06b2a8feaec0d9ad33d3b6",
-    "skills/video-summary/SKILL.md": "99ccb432c8d8442d49450082b45c9fdf4d87eccd522c00599b6f5819ddc0eb40",
-    "skills/video-summary/references/tools.md": "acfedced4bfa1573609f3dd112352f434488399761e3666f02d158c9066c3884"
+    "skills/setup-tldw/SKILL.md": "c2371d5fcc7063844a611a6c1661db84105d41459200909083320e120fe98d1b",
+    "skills/video-summary/SKILL.md": "5b1e7b6b4a4ad613ba95a55b79430f92ce326c356c9f57b877cdb6e952425e41",
+    "skills/video-summary/references/tools.md": "856dfe9b2d2c2a34b6d67450af049b165157af6c6cd62ed0dd20539450fa5006"
   },
   "skills": 2,
   "valid": true,
-  "version": "0.8.0"
+  "version": "0.8.1"
 }

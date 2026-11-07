@@ -25,9 +25,9 @@ wait JOB_ID --api-url ORIGIN [--timeout-ms 180000] [--local]
 Set TLDW_API_URL and TLDW_API_TOKEN in your private environment instead of flags.
 Tokens are never accepted as command arguments or saved by this tool.
 --local explicitly permits anonymous HTTP/HTTPS loopback development only.
-Free includes 500 monthly caption/text credits; Hobby USD20/1000 and Pro USD100/5000.
+Free includes 500 monthly caption/text credits; Hobby USD20/1000 and Pro USD99/5000.
 Captions/text or cached transcripts cost 1 credit/minute; fresh ASR costs 3.
-Fresh ASR requires --transcription if_needed and an eligible paid plan.
+Fresh ASR requires --transcription if_needed and server-authorized access. Ordinary paid accounts also require --max-credits; server-confirmed exempt accounts may omit it.
 Plan allowance is used before non-expiring purchased credits. --max-credits caps a job.
 `;
 
@@ -208,7 +208,7 @@ export async function checkMcp({ apiUrl, token, fetchImpl = fetch, signal }) {
   const initialized = await rpc(1, "initialize", {
     protocolVersion: protocol,
     capabilities: {},
-    clientInfo: { name: "tldw-cli", version: "0.2.0" },
+    clientInfo: { name: "tldw-cli", version: "0.2.1" },
   });
   if (
     typeof initialized.protocolVersion !== "string" ||
