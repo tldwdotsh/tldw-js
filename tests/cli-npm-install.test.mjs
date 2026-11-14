@@ -40,6 +40,7 @@ test(
         "--json",
         "--ignore-scripts",
         "--offline",
+        "--no-update-notifier",
         "--pack-destination",
         root,
       ],
@@ -51,6 +52,7 @@ test(
       [
         "exec",
         "--offline",
+        "--no-update-notifier",
         "--yes",
         "--ignore-scripts",
         "--no-audit",

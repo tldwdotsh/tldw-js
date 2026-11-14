@@ -1,25 +1,26 @@
 # Tool access
 
-The SaaS exposes 29 tools and checks scopes and ownership on every call. Names
+The SaaS checks scopes and ownership on every tool call. Names
 omit client-specific prefixes. `list_styles` and the `tldw://guide` resource
 accept any active personal API key. The resource is not an additional tool.
 
-| Tools                                                                  | Required scope                                  |
-| ---------------------------------------------------------------------- | ----------------------------------------------- |
-| account_usage                                                          | account:read                                    |
-| analyze_media, submit_video, retry_job, cancel_job, regenerate_summary | jobs:write                                      |
-| get_job, wait_job, list_jobs                                           | jobs:read                                       |
-| get_summary, get_transcript, export_summary                            | summaries:read                                  |
-| compare_tiktoks, cancel_comparison                                     | jobs:write                                      |
-| get_comparison                                                         | jobs:read; findings also require summaries:read |
-| ask_video                                                              | chat:write                                      |
-| get_video_chat                                                         | chat:read                                       |
-| create_share, revoke_share                                             | shares:write                                    |
-| create_batch, cancel_batch                                             | jobs:write                                      |
-| get_batch, list_batches                                                | jobs:read                                       |
-| submit_subtitles                                                       | uploads:write and jobs:write                    |
-| list_support_tickets, get_support_ticket                               | support:read                                    |
-| create_support_ticket, reply_support_ticket                            | support:write                                   |
+| Tools                                                                                      | Required scope                                  |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| account_usage                                                                              | account:read                                    |
+| analyze_media, extract_transcript, submit_video, retry_job, cancel_job, regenerate_summary | jobs:write                                      |
+| get_job, wait_job, list_jobs                                                               | jobs:read                                       |
+| get_summary, get_transcript, export_summary                                                | summaries:read                                  |
+| list_transcripts, get_saved_transcript, mark_transcript_read                               | summaries:read                                  |
+| compare_tiktoks, cancel_comparison                                                         | jobs:write                                      |
+| get_comparison                                                                             | jobs:read; findings also require summaries:read |
+| ask_video                                                                                  | chat:write                                      |
+| get_video_chat                                                                             | chat:read                                       |
+| create_share, revoke_share                                                                 | shares:write                                    |
+| create_batch, cancel_batch                                                                 | jobs:write                                      |
+| get_batch, list_batches                                                                    | jobs:read                                       |
+| submit_subtitles                                                                           | uploads:write and jobs:write                    |
+| list_support_tickets, get_support_ticket                                                   | support:read                                    |
+| create_support_ticket, reply_support_ticket                                                | support:write                                   |
 
 Embedded summary/comparison results require summaries:read in addition to the
 submission or status scope. Write-only access can submit work without exposing
@@ -27,7 +28,7 @@ its content. Instructions are limited to 4,000 characters and stay in the owner'
 private workflow. Public summary responses omit the brief, while shared
 result content can still reflect it.
 
-New Free users verify once in the browser. Free includes 500 monthly caption/text credits; Hobby includes 1,000 for
+New Free users verify once in the browser. Free includes 100 monthly caption/text credits; Hobby includes 1,000 for
 USD20/month and Pro includes 5,000 for USD99/month. All clients share account
 usage. Included allowance is used before non-expiring purchased credits.
 
@@ -40,6 +41,28 @@ distinct clips, round down to 0.01 credit and never redistribute unused shares.
 Review `job.credits` for estimated, reserved and final amounts. Failed/canceled
 jobs release reservations; completed clips retain their charges. Polling and
 identical idempotent replays create no additional processing charge.
+
+## Extract original source without an LLM
+
+Call `extract_transcript` with `media` (raw text, URL or source object), or an
+owned parsed subtitle `upload_id`. Supply exactly one. Optional
+`preferred_caption_languages` chooses captions in their original language;
+spending/ASR controls and `refresh_source` match analysis jobs. There is no
+`instructions` or `wait_seconds` argument and no summary or LLM call.
+
+The accepted receipt is asynchronous. Preserve `job_id`; poll `get_job` or
+`wait_job`, honoring the polling hint. When `output_mode="transcript"` completes,
+use `transcript_id` with `get_saved_transcript` (`offset=0`, `limit=100`), then
+follow `next_offset`. Transcript `wait_job` returns metadata and pointers with
+`result: null`, so it never hydrates a full source. Submission needs `jobs:write`, polling `jobs:read`, and
+source reads `summaries:read`. New extraction retains normal processing rates,
+ASR consent and caps. Existing saved-source reads start no job and charge no
+processing credits, so use `get_saved_transcript` directly when its ID is known.
+
+REST uses `POST /v1/transcripts` and always returns HTTP 202 without inline
+source; `GET /v1/transcripts/ID/page` reads bounded content. SDKs expose
+`submitTranscript` / `submit_transcript` and the polling convenience
+`extractTranscript` / `extract_transcript`. CLI: `tldw extract --media URL_OR_TEXT`.
 
 ## Analyze media with a custom focus
 
@@ -60,6 +83,13 @@ source types are `auto`, `text`, `url`, `x`, `youtube`, `tiktok` and `article`.
 A source object has exactly one of `text` or `url`. X objects can select
 `scope: "auto" | "post" | "thread" | "article"`. All URLs must be public and
 supported by the configured source provider. Text limits are operator-configured.
+
+X links default to `scope:auto`, detecting one attached video and using its captions
+when supported. `scope:post` reads post text alone. Use `instructions` to request a
+translated summary, for example `Summarize the spoken content in Spanish.` The
+result is generated text in the same schema; original captions stay unchanged.
+No X audio transcription, visual analysis, dubbing or subtitle translation is
+enabled. Missing video captions fail explicitly.
 
 General analysis results have `schema_version: "3"`, `answer`, `findings`,
 `sources` and `limitations`. Each finding references returned `source_ids`;
@@ -167,5 +197,4 @@ imply a person has replied.
 API keys cannot manage billing, credentials, account deletion or staff.
 Use the signed-in app for those actions; plugins cannot upgrade their permissions.
 
-
-Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `MAX_CREDITS_EXCEEDED` (HTTP 422). Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.
+Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `TRANSCRIPTION_NOT_ALLOWED` (HTTP 422); `MAX_CREDITS_EXCEEDED` (HTTP 422) means a supplied ceiling is invalid or below the required charge. Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.

@@ -14,21 +14,27 @@ init --api-url ORIGIN [--web-url ORIGIN] [--dir ./tldw-agent-plugin]
 doctor --api-url ORIGIN [--local]
   Check REST and MCP without creating a job or consuming an analysis.
 analyze --api-url ORIGIN (--media URL_OR_TEXT | --file PATH) [--instructions TEXT]
-        [--transcription never|if_needed] [--max-credits DECIMAL] [--force-asr]
+        [--transcription never|if_needed] [--max-credits DECIMAL] [--force-asr] [--refresh-source]
         [--idempotency-key KEY] [--timeout-ms 180000] [--local]
   Submit once, preserve the job ID, poll, and fetch the result.
   A non-secret idempotency key is printed before POST. If the reply is lost,
-  replay the exact media/instructions with that --idempotency-key.
+  replay the exact media/instructions/options with that --idempotency-key.
+extract --api-url ORIGIN (--media URL_OR_TEXT | --file PATH)
+        [--transcription never|if_needed] [--max-credits DECIMAL] [--force-asr] [--refresh-source]
+        [--idempotency-key KEY] [--timeout-ms 180000] [--local]
+  Save and retrieve original source only, without generated analysis or an LLM call.
+  Normal processing credits and transcription consent still apply.
 wait JOB_ID --api-url ORIGIN [--timeout-ms 180000] [--local]
   Resume a durable job. A wait timeout or Ctrl-C does not cancel server work.
 
 Set TLDW_API_URL and TLDW_API_TOKEN in your private environment instead of flags.
 Tokens are never accepted as command arguments or saved by this tool.
 --local explicitly permits anonymous HTTP/HTTPS loopback development only.
-Free includes 500 monthly caption/text credits; Hobby USD20/1000 and Pro USD99/5000.
+Free includes 100 monthly caption/text credits; Hobby USD20/1000 and Pro USD99/5000.
 Captions/text or cached transcripts cost 1 credit/minute; fresh ASR costs 3.
 Fresh ASR requires --transcription if_needed and server-authorized access. Ordinary paid accounts also require --max-credits; server-confirmed exempt accounts may omit it.
 Plan allowance is used before non-expiring purchased credits. --max-credits caps a job.
+X/article sources may reuse a saved snapshot for 24 hours; --refresh-source fetches current content without forcing ASR.
 `;
 
 function parseArguments(args) {
@@ -49,7 +55,7 @@ function parseArguments(args) {
   ]);
   for (let index = 0; index < args.length; index++) {
     const item = args[index];
-    if (item === "--local" || item === "--force-asr") {
+    if (["--local", "--force-asr", "--refresh-source"].includes(item)) {
       const flag = item.slice(2);
       if (options[flag])
         throw new SetupError("INVALID_ARGUMENT", `Duplicate ${item} flag.`);
@@ -93,18 +99,25 @@ function redactFailure(error, jobId, token, submissionKey) {
     (!token || !value.includes(token))
       ? value
       : undefined;
+  // The SDK raises TypeError only for invalid caller input, with static messages.
+  const invalidInput =
+    error instanceof TypeError &&
+    typeof error.message === "string" &&
+    error.message.length <= 300 &&
+    (!token || !error.message.includes(token));
   return {
     ok: false,
-    code:
-      safe(error?.code) ||
-      (error?.name === "AbortError" ? "INTERRUPTED" : "CLIENT_ERROR"),
+    code: invalidInput
+      ? "INVALID_ARGUMENT"
+      : safe(error?.code) ||
+        (error?.name === "AbortError" ? "INTERRUPTED" : "CLIENT_ERROR"),
     ...(Number.isInteger(error?.status) ? { status: error.status } : {}),
     ...(safe(error?.requestId) ? { request_id: error.requestId } : {}),
     ...(safe(error?.jobId || jobId) ? { job_id: error.jobId || jobId } : {}),
     ...(safe(submissionKey || error?.idempotencyKey)
       ? { idempotency_key: submissionKey || error.idempotencyKey }
       : {}),
-    ...(error instanceof SetupError
+    ...(error instanceof SetupError || invalidInput
       ? { message: error.message }
       : {
           message:
@@ -208,7 +221,7 @@ export async function checkMcp({ apiUrl, token, fetchImpl = fetch, signal }) {
   const initialized = await rpc(1, "initialize", {
     protocolVersion: protocol,
     capabilities: {},
-    clientInfo: { name: "tldw-cli", version: "0.2.1" },
+    clientInfo: { name: "tldw-cli", version: "0.2.6" },
   });
   if (
     typeof initialized.protocolVersion !== "string" ||
@@ -266,6 +279,8 @@ export async function runCli(
   let jobId;
   let token;
   let submissionKey;
+  // Set once arguments validate; announced only when the POST is really sent.
+  let pendingKey;
   const event = (value) =>
     stderr.write(
       JSON.stringify(value, (_name, item) =>
@@ -280,10 +295,10 @@ export async function runCli(
       return 0;
     }
     const { command, options, positional } = parseArguments([...argv]);
-    if (!["init", "doctor", "analyze", "wait"].includes(command))
+    if (!["init", "doctor", "analyze", "extract", "wait"].includes(command))
       throw new SetupError(
         "INVALID_ARGUMENT",
-        "Choose init, doctor, analyze or wait. Run tldw --help.",
+        "Choose init, doctor, analyze, extract or wait. Run tldw --help.",
       );
     const origin = validateOrigin(options["api-url"] || env.TLDW_API_URL);
     if (options.local && !isLoopback(new URL(origin).hostname))
@@ -321,11 +336,12 @@ export async function runCli(
               "timeout-ms",
               "media",
               "file",
-              "instructions",
+              ...(command === "analyze" ? ["instructions"] : []),
               "idempotency-key",
               "transcription",
               "max-credits",
               "force-asr",
+              "refresh-source",
             ];
     if (
       Object.keys(options).some((key) => !allowed.includes(key)) ||
@@ -351,7 +367,16 @@ export async function runCli(
       apiUrl: origin,
       token,
       allowAnonymous: !!options.local,
-      fetch: fetchImpl,
+      // Print the idempotency key immediately before the first POST: an accepted
+      // request whose reply is lost stays replayable, and a request rejected by
+      // local validation never prints a key for a submission that was not sent.
+      fetch: (url, init) => {
+        if (pendingKey && init?.method === "POST" && !submissionKey) {
+          submissionKey = pendingKey;
+          event({ event: "submission", idempotency_key: submissionKey });
+        }
+        return fetchImpl(url, init);
+      },
     });
     if (command === "doctor") {
       let account;
@@ -401,7 +426,7 @@ export async function runCli(
       if (!!options.media === !!options.file)
         throw new SetupError(
           "INVALID_ARGUMENT",
-          "analyze needs exactly one --media or --file.",
+          `${command} needs exactly one --media or --file.`,
         );
       let media = options.media;
       if (options.file) {
@@ -438,13 +463,14 @@ export async function runCli(
           "INVALID_IDEMPOTENCY_KEY",
           "Use a non-secret idempotency key of 1–128 letters, digits, dots, underscores, colons or hyphens. Never use an API token as an idempotency key.",
         );
-      submissionKey = candidateKey;
-      // Print before POST: an accepted request whose reply is lost must remain
-      // safely replayable with the exact media, instructions and stable key.
-      event({ event: "submission", idempotency_key: submissionKey });
-      const receipt = await client.submitAnalysis(media, {
-        instructions: options.instructions,
-        idempotencyKey: submissionKey,
+      pendingKey = candidateKey;
+      const submit =
+        command === "extract" ? client.submitTranscript : client.submitAnalysis;
+      const receipt = await submit.call(client, media, {
+        ...(command === "analyze"
+          ? { instructions: options.instructions }
+          : {}),
+        idempotencyKey: pendingKey,
         signal,
         ...(options.transcription
           ? { transcription: options.transcription }
@@ -453,8 +479,11 @@ export async function runCli(
           ? { maxCredits: options["max-credits"] }
           : {}),
         ...(options["force-asr"] ? { forceAsr: true } : {}),
+        ...(options["refresh-source"] ? { refreshSource: true } : {}),
       });
       jobId = receipt.job_id;
+      // An accepted receipt proves the request was sent.
+      submissionKey = pendingKey;
       event({
         accepted: true,
         job_id: jobId,
@@ -472,8 +501,15 @@ export async function runCli(
           progress: value.progress,
         }),
     });
-    const summary = await client.getSummary(job.summary_id, { signal });
-    stdout.write(JSON.stringify({ job, summary }, null, 2) + "\n");
+    const output =
+      job.output_mode === "transcript"
+        ? {
+            transcript: await client.getSavedTranscript(job.transcript_id, {
+              signal,
+            }),
+          }
+        : { summary: await client.getSummary(job.summary_id, { signal }) };
+    stdout.write(JSON.stringify({ job, ...output }, null, 2) + "\n");
     return 0;
   } catch (error) {
     const result = redactFailure(error, jobId, token, submissionKey);

@@ -1,4 +1,4 @@
-# tldw.sh agent plugin · 0.8.1
+# tldw.sh agent plugin · 0.8.5
 
 **Too long; didn't watch.** Connect with a scoped tldw.sh API key from any HTTP
 client, script or agent.
@@ -41,23 +41,36 @@ repository does not deploy or verify that hosted service.
 ## Prepare the plugin with the CLI
 
 Open your operator's **Connect your agent** page (`/agents`) for the exact install
-command and download origin. The downloadable `tldw-client-0.2.1.tgz` contains a
-dependency-free Node client, CLI and this reviewed plugin. It is a real package
-download; a public npm registry listing is not required.
+command, download origin and SHA-256 checksum. The downloadable
+`tldw-client-0.2.6.tgz` contains a dependency-free Node client, CLI and this
+reviewed plugin. Install it only from your operator's download URL; do not
+substitute a package name from a public registry.
+
+Download the tarball, check it against the SHA-256 printed on your `/agents` page
+(the page embeds it from the release manifest when the site is built), and only
+then run the verified local file:
 
 ```sh
-# Use the exact HTTPS app/API origins shown in your account. Do not put keys in flags.
-npx --yes 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.1.tgz' init \
-  --api-url 'https://YOUR_API_ORIGIN' --web-url 'https://YOUR_APP_ORIGIN' \
-  --dir ./tldw-agent-plugin
+# Use the exact HTTPS app/API origins and SHA-256 shown in your account.
+# Do not put keys in flags.
+curl -fsSLo tldw-client-0.2.6.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.6.tgz' &&
+  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.6.tgz' | shasum -a 256 -c - &&
+  npx --yes ./tldw-client-0.2.6.tgz init \
+    --api-url 'https://YOUR_API_ORIGIN' --web-url 'https://YOUR_APP_ORIGIN' \
+    --dir ./tldw-agent-plugin
 ```
+
+The checksum step stops the chain when the bytes differ. Never skip it or pass
+the remote URL straight to `npx`. Without `shasum`, use `sha256sum -c -` with the
+same input line.
 
 `init` verifies the embedded files and writes a **new directory** with the correct
 MCP URLs. It refuses an existing destination or symlink parent, stores no key and
 does not modify global settings or execute a native plugin install. Follow its
 Claude Code/Codex commands or the client examples below. Configure the private
-`TLDW_API_TOKEN` environment through your secret manager, then run the same package's
-`doctor --api-url 'https://YOUR_API_ORIGIN'` command. Doctor checks REST/MCP with
+`TLDW_API_TOKEN` environment through your secret manager, then run
+`npx --yes ./tldw-client-0.2.6.tgz doctor --api-url 'https://YOUR_API_ORIGIN'`
+from the same directory as the verified file. Doctor checks REST/MCP with
 read-only requests; it never submits inference, sends support messages or consumes
 an analysis. `account:read` is optional for its usage check.
 
@@ -67,12 +80,32 @@ client only; resume the durable job instead of submitting it again. For an
 explicitly enabled loopback development API, `doctor`, `analyze` and `wait` accept
 `--local` for anonymous checks. This option refuses non-loopback origins.
 
+
+## X video summary or translated summary
+
+Use the bundled SDK with the X post URL, or the CLI from a project where the client is installed (`npx tldw`):
+
+```sh
+npx tldw analyze --media 'https://x.com/hamptonism/status/2071631335836225751' \
+  --instructions 'Summarize the spoken content in Spanish. Keep it concise and avoid repetition.' \
+  --transcription never --idempotency-key x-video-spanish-001
+```
+
+Save the accepted job ID before waiting; use `tldw wait JOB_ID` to resume after a
+timeout. Default `scope=auto` detects one attached video and retrieves accessible
+captions. An explicit X media object with `scope=post` reads only the post text.
+The result is generated analysis text, not dubbed audio or a translated subtitle
+file. Captions remain saved in their original language. X audio transcription and
+visual analysis are not enabled; missing captions fail clearly. Actual video
+duration is billed at the standard caption rate under normal rounding rules.
+Use a new stable idempotency key when changing instructions or language.
+
 ## Configure your account
 
 1. Get the correct MCP endpoint from your operator's **API keys** page. Source
    templates use a reserved `.invalid` endpoint; operator-generated packages
    may already contain the configured endpoint.
-2. Sign up in the web app. New Free accounts activate their 500-credit monthly allowance
+2. Sign up in the web app. New Free accounts activate their 100-credit monthly allowance
    once in the browser, completing the configured account/bot verification.
    Agents reuse that activated account without a CAPTCHA on each request.
 3. Create an API key in **API keys**. Start with `jobs:write`, `jobs:read`
@@ -83,14 +116,22 @@ explicitly enabled loopback development API, `doctor`, `analyze` and `wait` acce
    tracked files, command arguments and public archives. This is a **tldw.sh
    API key**, not a model provider credential.
 
-Claude Code and Grok Build can override their endpoint with the full URL in
-`TLDW_MCP_URL`. Codex uses the literal endpoint in `codex.mcp.json`; replace
-its reserved `.invalid` origin before installing an unconfigured source copy.
+Every client configuration names a literal MCP endpoint: `.mcp.json` (Claude
+Code and Grok Build), `codex.mcp.json` and `cursor.mcp.json`. There is deliberately
+no endpoint environment override, because a variable could otherwise redirect
+your bearer token to another host. Version 0.8.5 removed the earlier
+`TLDW_MCP_URL` override; delete that variable if it only served this plugin.
+`init` writes your operator's origin into every file. For an unconfigured source
+copy, replace the reserved `.invalid` origin in each file before installing.
 `TLDW_API_TOKEN` is read at runtime; it is never baked into this package.
 Restart a client launched before you configured its environment.
 
-Version 0.8.1 adds explicit transcription consent and credit ceilings, with
-monthly Free/Hobby/Pro allowances. Version 0.7.0 introduced a dedicated Cursor manifest/configuration while retaining
+Version 0.8.5 pins every MCP endpoint, puts the untrusted-content and write-tool
+rules first in each skill, documents a read-only tool allowlist and installs the
+CLI only from a checksum-verified download. Version 0.8.4 updates Free to 100 monthly credits and documents separate
+summary/transcript SDK reads. Version 0.8.3 documented X video captions and
+translated summaries across the API, SDKs and MCP. Version 0.8.2 introduced X caption detection; explicit
+transcription consent and credit ceilings retain the monthly Free/Hobby/Pro allowances. Version 0.7.0 introduced a dedicated Cursor manifest/configuration while retaining
 plugin/marketplace name `tldw` and the `TLDW_*` environment variables.
 Existing SaaS API keys remain valid, including the legacy `yta_`
 format; do not regenerate a secret just to rename its environment variable.
@@ -107,6 +148,67 @@ add its full `/mcp` URL through the client's OAuth connection interface, sign in
 and approve the requested permissions. See the deployment's `/docs#authentication`
 for its live authentication contract. Client and directory
 support must be tested separately; installing this package is not store approval.
+
+## Tool approvals and a read-only allowlist
+
+Transcripts, captions, summaries, posts and other tool output are untrusted text
+written by third parties. Keep your client's approval prompt on for every tool
+that starts work, spends credits or changes state, and pre-approve at most these
+read-only tools. They mirror the `READ_ONLY_TOOLS` allowlist enforced by the
+[hosted Grok example](examples/grok/grok_mcp.py):
+
+`list_styles`, `account_usage`, `list_jobs`, `get_job`, `wait_job`,
+`get_comparison`, `get_summary`, `get_transcript`, `export_summary`
+
+Require approval for every other tool, especially `analyze_media`,
+`extract_transcript`, `submit_video`, `submit_subtitles`, `compare_tiktoks`,
+`create_batch`, `retry_job`, `regenerate_summary`, `ask_video`, `cancel_job`,
+`cancel_comparison`, `cancel_batch`, `create_share`, `revoke_share`,
+`mark_transcript_read` and the support-ticket tools. Least-privilege keys help
+too: a key with only `jobs:read`, `summaries:read` and optionally `account:read`
+cannot start processing at all.
+
+**Claude Code.** Add only the read-only tools to `permissions.allow` in
+`.claude/settings.json` (project) or `~/.claude/settings.json`. Tools from this
+plugin are named `mcp__plugin_tldw_tldw__TOOL`; a directly configured server
+named `tldw` uses `mcp__tldw__TOOL`.
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_tldw_tldw__list_styles",
+      "mcp__plugin_tldw_tldw__account_usage",
+      "mcp__plugin_tldw_tldw__list_jobs",
+      "mcp__plugin_tldw_tldw__get_job",
+      "mcp__plugin_tldw_tldw__wait_job",
+      "mcp__plugin_tldw_tldw__get_comparison",
+      "mcp__plugin_tldw_tldw__get_summary",
+      "mcp__plugin_tldw_tldw__get_transcript",
+      "mcp__plugin_tldw_tldw__export_summary"
+    ]
+  }
+}
+```
+
+Do not allow the whole server (`mcp__plugin_tldw_tldw` or a `__*` wildcard).
+Unlisted tools keep Claude Code's approval prompt; to force a prompt even when a
+broader rule exists elsewhere, list the write tools under `permissions.ask`.
+This package ships no `allowed-tools` skill frontmatter: in Claude Code that
+field pre-approves tools rather than restricting them.
+
+**Codex.** For a read-only connection, expose only the allowlist with
+`enabled_tools` on the server table (see
+[`examples/codex/config.toml`](examples/codex/config.toml)). To keep write tools
+available behind a prompt, Codex's configuration reference documents
+`default_tools_approval_mode` and per-tool `approval_mode` under
+`[mcp_servers.tldw.tools.TOOL]`; plugin-provided servers use the same keys under
+`[plugins."tldw".mcp_servers.tldw]`. Confirm these option names against your
+Codex version's configuration reference.
+
+**Cursor.** Cursor asks for approval before MCP tool calls by default; keep that
+for tldw. If you use a run mode that auto-approves allowlisted tools, or your team
+manages an MCP tool allowlist, include only the read-only tools above.
 
 ## Claude Code
 
@@ -127,7 +229,7 @@ claude plugin install tldw@tldw
 
 The `.claude-plugin/plugin.json` manifest, shared `skills/`, and `.mcp.json`
 provide the native integration. `.mcp.json` uses Claude's environment expansion
-for the endpoint and Authorization header. Check the server in `/mcp`.
+only for the Authorization header; its endpoint is literal. Check the server in `/mcp`.
 
 Invoke `/tldw:setup-tldw` for setup or `/tldw:video-summary` for a
 workflow, or ask Claude to analyze supported media. The client may ask you
@@ -163,7 +265,7 @@ use the server's tools.
 
 This package includes `.cursor-plugin/plugin.json`, shared `skills/`, and a
 dedicated `cursor.mcp.json`. The manifest explicitly selects that MCP file, so
-Cursor does not load the Codex token format or Claude's endpoint expansion.
+Cursor does not load the Codex token format or Claude's configuration.
 The operator's CLI `init` renders its literal MCP endpoint. Replace the reserved
 `.invalid` origin before using an unconfigured source checkout.
 
@@ -243,7 +345,7 @@ Hobby and Pro limits still apply. Included plan credits are consumed before
 non-expiring purchased credits. The plugin cannot purchase credits or bypass
 length, concurrency or rate limits. Token revocation in the app disables access.
 
-Free includes 500 monthly caption/text credits; Hobby includes 1,000 for
+Free includes 100 monthly caption/text credits; Hobby includes 1,000 for
 USD20/month and Pro includes 5,000 for USD99/month. All clients share account
 usage. Included allowance is used before non-expiring purchased credits.
 
@@ -358,4 +460,4 @@ It does not license the separately operated SaaS or waive subscription terms.
 - [Cursor MCP environment variables](https://cursor.com/docs/mcp#variables)
 
 
-Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `MAX_CREDITS_EXCEEDED` (HTTP 422). Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.
+Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `TRANSCRIPTION_NOT_ALLOWED` (HTTP 422); `MAX_CREDITS_EXCEEDED` (HTTP 422) means a supplied ceiling is invalid or below the required charge. Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.
