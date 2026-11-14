@@ -3,19 +3,13 @@ import { randomUUID } from "node:crypto";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const JOB_STATES = new Set([
   "queued",
+  // Waiting for one of the plan's concurrent-job slots; not terminal.
+  "queued_for_slot",
   "fetching_metadata",
   "fetching_transcript",
   "downloading_audio",
   "transcribing",
   "summarizing",
-  "completed",
-  "failed",
-  "canceled",
-]);
-const COMPARISON_STATES = new Set([
-  "queued",
-  "waiting",
-  "processing",
   "completed",
   "failed",
   "canceled",
@@ -745,7 +739,7 @@ export class TldwClient {
     integer(pollIntervalMs, "pollIntervalMs", 250, 30_000);
     if (onProgress !== undefined && typeof onProgress !== "function")
       throw new TypeError("onProgress must be a function.");
-    const details = kind === "job" ? { jobId: id } : { comparisonId: id };
+    const details = { jobId: id };
     try {
       const remembered = this.#pollHints.get(`${kind}:${id}`);
       if (remembered) {
@@ -758,21 +752,13 @@ export class TldwClient {
         if (Date.now() >= deadline) throw new TldwTimeoutError();
         const { data, retryAfterMs } = await this.#request(
           "GET",
-          `/v1/${kind === "job" ? "jobs" : "comparisons"}/${id}`,
+          `/v1/jobs/${id}`,
           { signal, deadline },
         );
-        const resource =
-          kind === "job" ? this.#job(data, id) : this.#comparison(data, id);
+        const resource = this.#job(data, id);
         if (onProgress) await onProgress(resource);
         if (resource.status === "completed") {
           this.#pollHints.delete(`${kind}:${id}`);
-          if (kind === "comparison" && !resource.result)
-            throw new TldwError(
-              "The comparison completed but result access is unavailable; summaries:read is required.",
-              { code: "RESULT_SCOPE_REQUIRED", comparisonId: id },
-            );
-          if (kind === "comparison")
-            object(resource.result, "comparison result");
           return resource;
         }
         if (["failed", "canceled"].includes(resource.status)) {
@@ -851,60 +837,5 @@ export class TldwClient {
       }
       throw error;
     }
-  }
-  async compareTikToks(
-    urls,
-    { instructions, idempotencyKey, signal, ...spending } = {},
-  ) {
-    if (!Array.isArray(urls) || urls.length < 2 || urls.length > 20)
-      throw new TypeError("Supply between 2 and 20 TikTok URLs.");
-    const stableKey = key(idempotencyKey);
-    const limits = spendingOptions(spending);
-    let data, retryAfterMs;
-    try {
-      ({ data, retryAfterMs } = await this.#request("POST", "/v1/comparisons", {
-        body: {
-          urls,
-          ...(instructions !== undefined ? { instructions } : {}),
-          ...limits,
-        },
-        signal,
-        idempotencyKey: stableKey,
-      }));
-      const id = data.comparison?.id;
-      if (typeof id !== "string" || !UUID.test(id))
-        throw new TldwError("The API returned an invalid comparison ID.", {
-          code: "INVALID_RESPONSE",
-        });
-      this.#rememberPollHint(
-        id,
-        "comparison",
-        data.comparison.next_poll_after_ms,
-        retryAfterMs,
-      );
-      return this.#comparison(data, id);
-    } catch (error) {
-      if (error && typeof error === "object") error.idempotencyKey = stableKey;
-      throw error;
-    }
-  }
-  #comparison(data, id) {
-    const resource = object(data.comparison, "comparison");
-    if (resource.id !== id || !COMPARISON_STATES.has(resource.status))
-      throw new TldwError("API returned an invalid comparison.", {
-        code: "INVALID_RESPONSE",
-        comparisonId: id,
-      });
-    return resource;
-  }
-  async getComparison(id, { signal } = {}) {
-    id = identifier(id);
-    const { data } = await this.#request("GET", `/v1/comparisons/${id}`, {
-      signal,
-    });
-    return this.#comparison(data, id);
-  }
-  async waitForComparison(id, options = {}) {
-    return this.#wait(identifier(id), "comparison", options);
   }
 }

@@ -23,15 +23,14 @@ XAI_RESPONSES_URL = "https://api.x.ai/v1/responses"
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_PROMPT_BYTES = 20_000
 READ_ONLY_TOOLS = (
-    "list_styles",
     "account_usage",
     "list_jobs",
     "get_job",
     "wait_job",
-    "get_comparison",
     "get_summary",
     "get_transcript",
-    "export_summary",
+    "list_transcripts",
+    "get_saved_transcript",
 )
 DEFAULT_PROMPT = (
     "List up to three of my latest jobs. For one completed job, read its summary "

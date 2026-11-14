@@ -13,9 +13,9 @@ page. Download it, verify it against the SHA-256 checksum shown on that page,
 then install the verified local file:
 
 ```sh
-curl -fsSLo tldw-client-0.2.6.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.6.tgz' &&
-  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.6.tgz' | shasum -a 256 -c - &&
-  npm install ./tldw-client-0.2.6.tgz
+curl -fsSLo tldw-client-0.2.7.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.7.tgz' &&
+  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.7.tgz' | shasum -a 256 -c - &&
+  npm install ./tldw-client-0.2.7.tgz
 ```
 
 Only `@tldw/client` on npm and your operator's verified download are this
@@ -24,9 +24,12 @@ CommonJS consumers can use dynamic `import("@tldw/client")`.
 
 Supply your deployment's API origin and a scoped **tldw API key** through your
 secret manager. Never put a real key in a prompt, source file, command argument,
-or checked-in client configuration. REST/MCP/plugin clients share your account's
-100 monthly Free caption/text credits, Hobby/Pro limits, and purchased credits. Signup and
-one-time human verification happen in the browser; processing calls stay headless.
+or checked-in client configuration. Signup and one-time human verification happen
+in the browser; processing calls stay headless.
+
+The SDK, the Claude connector, Claude Code and the skill use the same tldw.sh
+account and credits. A new API key does not add free credits. Free includes 100
+monthly caption/text credits and stops at 30 minutes per source.
 
 ```js
 import { TldwClient, TldwTimeoutError } from "@tldw/client";
@@ -63,17 +66,55 @@ The `analyze(media, options)` convenience helper combines those calls and return
 `error.receipt`. A submission failure carries `error.idempotencyKey`, including
 when the SDK generated the key. Preserve it before retrying an unknown outcome.
 
+## Three prompts
+
+Each is one link and one job: submit, keep the job ID, wait, then read.
+
+```js
+const media = "https://youtu.be/VIDEO_ID";
+// YouTube research brief. Cost: 1 credit per caption minute. A 20-minute talk is 20 credits. Reading the saved result again is free.
+const brief = await client.submitAnalysis(media, {
+  instructions: "Main argument and three useful takeaways. Cite the minute for each.",
+  idempotencyKey: "brief-001",
+});
+// Transcript only: "Transcript only. Do not summarize." Use submitTranscript; it sends no
+// instructions. Cost: Same caption rate, no summary. Reading it again is free.
+const source = await client.submitTranscript(media, { idempotencyKey: "source-001" });
+// Claims and evidence. Cost: Same caption rate. Audio only on the platforms account_usage lists for your plan, at 3 credits a minute.
+const claims = await client.submitAnalysis(media, {
+  instructions:
+    "List practical claims, the evidence, and the caveats. Flag anything supported by one example.",
+  idempotencyKey: "claims-001",
+});
+const job = await client.waitForJob(brief.job_id);
+console.log((await client.getSummary(job.summary_id)).content);
+```
+
+## Limits that stop a job
+
+Four limits can stop a job. `getUsage` / `get_usage` (`GET /v1/me`) returns them
+as `walls`, each with `active` for your account. A wall error carries
+`error.details.wall` and `error.details.upgrade`, with the next plan and a
+`billing_url` for the account owner, at submit time and on a failed job.
+
+- Source length: Free stops at 30 minutes per source; paid plans allow longer
+  sources up to their plan limit.
+- Monthly credits: when included credits run out, new jobs stop until the next
+  billing period or an upgrade. Agents cannot buy credits.
+- Audio: a source without captions needs audio transcription, which runs only on
+  plans and platforms that allow it (`plan.transcription_platforms`).
+- Concurrent jobs: a job over your plan's running-job limit may wait with status
+  `queued_for_slot` and a `queue_position`. It is not terminal; the wait helpers
+  keep polling until it runs. A full queue returns HTTP 429 `RATE_LIMITED`.
+
 Methods:
 
+- `submitTranscript(media, { transcription?, maxCredits?, refreshSource?, idempotencyKey?, signal? })`
 - `submitAnalysis(media, { instructions?, transcription?, maxCredits?, forceAsr?, refreshSource?, idempotencyKey?, signal? })`
 - `getJob(jobId, { signal? })` / `getSummary(summaryId, { signal? })`
 - `waitForJob(jobId, { timeoutMs?, pollIntervalMs?, signal?, onProgress? })`
 - `analyze(media, { ...submissionOptions, ...waitOptions })`
 - `getUsage({ signal? })` requires `account:read`.
-- `compareTikToks(urls, { instructions?, idempotencyKey?, signal? })` returns the
-  accepted comparison view, including its durable ID.
-- `getComparison(id)` / `waitForComparison(id, waitOptions)` return the unwrapped
-  comparison view. A successful wait requires result access (`summaries:read`).
 
 Pass an `AbortSignal` to stop the client wait; it never cancels accepted work on
 the server. Waits default to 180 seconds and allow a finite maximum of one hour.
@@ -296,15 +337,24 @@ these controls in the same idempotent request body on retries. Jobs expose
 `credits.estimated`, `reserved`, `final`, the billing class/rate and real source
 duration; polling does not create another processing charge.
 
-For `compareTikToks` / `compare_tiktoks`, the cap covers all distinct supplied
-clips: each receives an equal share rounded down to 0.01 credit. Unused shares
-are not redistributed. Comparison aggregation adds no customer processing credits.
 Source minutes round up to 0.1 minute with a 0.5-minute minimum before the rate
 multiplier. Raw text uses estimated reading minutes.
 
 Free includes 100 credits per month for captions/text, Hobby costs USD20/month
 with 1,000 credits, and Pro costs USD99/month with 5,000 credits. Included
-allowance is used first, then purchased credits, which do not expire. Reading
-account usage does not buy credits or change plans.
+credits reset monthly. Agents cannot buy credits, and reading account usage does
+not change plans.
 
 Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `TRANSCRIPTION_NOT_ALLOWED` (HTTP 422); `MAX_CREDITS_EXCEEDED` (HTTP 422) means a supplied ceiling is invalid or below the required charge. Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.
+
+## Changes in 0.2.7
+
+API keys can reach only the customer API, so the client now calls only those
+routes. Removed:
+
+- `compareTikToks()` (`POST /v1/comparisons`)
+- `getComparison()` (`GET /v1/comparisons/{id}`)
+- `waitForComparison()` (polled `GET /v1/comparisons/{id}`)
+- the `Comparison` TypeScript type
+
+`TldwError.comparisonId` remains for compatibility and is always `null`.

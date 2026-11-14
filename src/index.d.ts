@@ -21,6 +21,7 @@ export interface Job {
   id: string;
   status:
     | "queued"
+    | "queued_for_slot"
     | "fetching_metadata"
     | "fetching_transcript"
     | "downloading_audio"
@@ -34,9 +35,14 @@ export interface Job {
   output_mode?: "summary" | "analysis" | "transcript";
   transcript_id?: string | null;
   transcript_url?: string | null;
-  error?: { code: string; message: string } | null;
+  /** `details` carries allow-listed public fields such as `wall` and `upgrade`. */
+  error?: { code: string; message: string; details?: Record<string, unknown> | null } | null;
   next_poll_after_ms?: number | null;
   credits?: JobCredits;
+  /** Set while `status` is `queued_for_slot`: 1 means next to start. */
+  queue_position?: number | null;
+  max_concurrent_jobs?: number | null;
+  queue_notice?: string | null;
   [key: string]: unknown;
 }
 export interface AnalysisAccepted {
@@ -125,34 +131,6 @@ export interface TranscriptReadResult {
   read_at: string | null;
   unread: boolean;
 }
-export interface Comparison {
-  id: string;
-  status:
-    | "queued"
-    | "waiting"
-    | "processing"
-    | "completed"
-    | "failed"
-    | "canceled";
-  result?: {
-    summary: string;
-    findings: Array<Record<string, unknown>>;
-    limitations: string[];
-  } | null;
-  error?: { code: string; message: string } | null;
-  coverage?: Record<string, number>;
-  next_poll_after_ms?: number | null;
-  credits?: {
-    max_credits: number | string | null;
-    per_job_max_credits: number | string | null;
-    allocation_count: number | null;
-    unused_budget_redistributed: false;
-    reserved: number | string;
-    billed_so_far: number | string;
-    final: number | string | null;
-  } | null;
-  [key: string]: unknown;
-}
 export interface SubmitOptions {
   /** Analysis focus, format or output language; e.g. "Summarize in Spanish." */
   instructions?: string;
@@ -160,7 +138,7 @@ export interface SubmitOptions {
   signal?: AbortSignal;
   /** Default never: use captions/text or an existing cached transcript only. */
   transcription?: "never" | "if_needed";
-  /** Decimal credit ceiling; aggregate fixed-share ceiling for comparisons. */
+  /** Decimal credit ceiling for one job. */
   maxCredits?: number | string;
   /** Requires explicit transcription=if_needed and server-authorized ASR access. */
   forceAsr?: boolean;
@@ -196,6 +174,7 @@ export interface ErrorDetails {
   requestId?: string | null;
   retryAfterMs?: number | null;
   jobId?: string | null;
+  /** @deprecated Comparisons were removed from the client; always null. */
   comparisonId?: string | null;
   details?: Record<string, unknown> | null;
 }
@@ -206,6 +185,7 @@ export class TldwError extends Error {
   requestId: string | null;
   retryAfterMs: number | null;
   jobId: string | null;
+  /** @deprecated Comparisons were removed from the client; always null. */
   comparisonId: string | null;
   /** Redacted `error.details` from the API, e.g. `{ job_id }` or `{ required_scope }`. */
   details: Record<string, unknown> | null;
@@ -216,8 +196,8 @@ export class TldwTimeoutError extends TldwError {
   constructor(message?: string, details?: ErrorDetails);
 }
 export class TldwJobError extends TldwError {
-  constructor(resource: Job | Comparison, kind?: "job" | "comparison");
-  resource: Job | Comparison;
+  constructor(resource: Job, kind?: "job");
+  resource: Job;
 }
 export function validateApiUrl(value: string): {
   origin: string;
@@ -294,13 +274,4 @@ export class TldwClient {
     job: Job;
     summary: Summary<TContent>;
   }>;
-  compareTikToks(urls: string[], options?: SubmitOptions): Promise<Comparison>;
-  getComparison(
-    id: string,
-    options?: { signal?: AbortSignal },
-  ): Promise<Comparison>;
-  waitForComparison(
-    id: string,
-    options?: WaitOptions<Comparison>,
-  ): Promise<Comparison>;
 }

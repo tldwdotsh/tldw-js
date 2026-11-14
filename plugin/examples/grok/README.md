@@ -15,7 +15,7 @@ unconfigured source copy, replace its reserved `.invalid` origin before
 installing. Supply `TLDW_API_TOKEN` from your secret manager or private shell
 environment. A local Grok Build process can use a loopback endpoint such as `http://localhost:8000/mcp`.
 API keys come from **API keys** in the web app; use the minimum scopes needed.
-For custom summaries and TikTok comparisons, use `jobs:write`, `jobs:read` and `summaries:read`. Add
+For custom summaries and transcripts, use `jobs:write`, `jobs:read` and `summaries:read`. Add
 `account:read` for allowance checks, `uploads:write` for subtitles, and
 `chat:write`/`chat:read` for queued video questions. Never use a provider API key
 or Clerk session as the SaaS token.
@@ -59,15 +59,14 @@ with `grok mcp remove tldw`. See the official
 
 ## Native processing workflows
 
-The native plugin discovers all 29 MCP tools. `analyze_media` accepts raw text,
+The native plugin discovers the hosted MCP tools. `analyze_media` accepts raw text,
 X posts/threads/articles, public articles or YouTube/TikTok URLs as `media`, plus
 custom `instructions`. It always returns a durable job receipt without output.
 Poll `get_job` for status/progress; after completion call `get_summary` with its
 `summary_id`. It has no `wait_seconds` argument. Never resubmit to poll progress. Use
-`submit_video` for explicit video styles and `compare_tiktoks` for 2–20 supplied clips,
-then `get_comparison` for cited sample findings and coverage. `cancel_comparison`
-stops unfinished work when requested. These comparisons use captions/transcribed
-speech, without claiming platform-wide trends or unseen visual analysis.
+`extract_transcript` for original captions or text without a summary. Analyses
+use captions/transcribed speech, without claiming platform-wide trends or unseen
+visual analysis.
 
 General analysis results include source-ID citations and limitations. An X URL
 requires the operator's X read/search access; paste full source text when a link
@@ -107,8 +106,9 @@ python3 examples/grok/grok_mcp.py --run
 python3 examples/grok/grok_mcp.py --run --prompt-file ./question.txt
 ```
 
-Only read tools are exposed, including `wait_job` and `get_comparison` for existing work. Processing, cancellation, support messages and public
-sharing and new comparisons are unavailable in this API example; use the native plugin for those
+Only read tools are exposed: `account_usage`, `list_jobs`, `get_job`, `wait_job`,
+`get_summary`, `get_transcript`, `list_transcripts` and `get_saved_transcript`.
+Processing, cancellation and other write tools are unavailable in this API example; use the native plugin for those
 user-authorized workflows. xAI currently does not support MCP `require_approval`,
 so the allowlist is enforced in the request instead. The example disables stored
 response continuation, refuses redirects, caps response size and prints only the

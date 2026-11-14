@@ -33,7 +33,7 @@ Tokens are never accepted as command arguments or saved by this tool.
 Free includes 100 monthly caption/text credits; Hobby USD20/1000 and Pro USD99/5000.
 Captions/text or cached transcripts cost 1 credit/minute; fresh ASR costs 3.
 Fresh ASR requires --transcription if_needed and server-authorized access. Ordinary paid accounts also require --max-credits; server-confirmed exempt accounts may omit it.
-Plan allowance is used before non-expiring purchased credits. --max-credits caps a job.
+Included credits reset monthly; agents cannot buy credits. --max-credits caps a job.
 X/article sources may reuse a saved snapshot for 24 hours; --refresh-source fetches current content without forcing ASR.
 `;
 
@@ -221,7 +221,7 @@ export async function checkMcp({ apiUrl, token, fetchImpl = fetch, signal }) {
   const initialized = await rpc(1, "initialize", {
     protocolVersion: protocol,
     capabilities: {},
-    clientInfo: { name: "tldw-cli", version: "0.2.6" },
+    clientInfo: { name: "tldw-cli", version: "0.2.7" },
   });
   if (
     typeof initialized.protocolVersion !== "string" ||
@@ -239,19 +239,29 @@ export async function checkMcp({ apiUrl, token, fetchImpl = fetch, signal }) {
       "MCP_PROTOCOL_ERROR",
       "MCP returned an invalid tool listing.",
     );
-  const expected = ["analyze_media", "get_job", "get_summary", "list_styles"];
-  if (
-    !expected.every((name) => listing.tools.some((tool) => tool.name === name))
-  )
+  const listed = new Set(listing.tools.map((tool) => tool?.name));
+  const expected = ["analyze_media", "get_job", "get_summary"];
+  if (!expected.every((name) => listed.has(name)))
     throw new SetupError(
       "MCP_TOOLS_MISSING",
       "The endpoint does not expose the required tldw tools.",
     );
-  const checked = await rpc(3, "tools/call", {
-    name: "list_styles",
-    arguments: {},
-  });
-  if (checked.isError)
+  // account_usage needs account:read; an analysis-only key falls back to
+  // list_jobs. Both are read-only and submit nothing.
+  const candidates = [
+    ["account_usage", {}],
+    ["list_jobs", { limit: 1 }],
+  ].filter(([name]) => listed.has(name));
+  let readOnlyCheck = null;
+  let id = 3;
+  for (const [name, args] of candidates) {
+    const checked = await rpc(id++, "tools/call", { name, arguments: args });
+    if (!checked.isError) {
+      readOnlyCheck = name;
+      break;
+    }
+  }
+  if (!readOnlyCheck)
     throw new SetupError(
       "MCP_CHECK_FAILED",
       "The read-only MCP connection check was rejected.",
@@ -261,7 +271,7 @@ export async function checkMcp({ apiUrl, token, fetchImpl = fetch, signal }) {
     protocol,
     tools_available: listing.tools.length,
     required_tools_present: true,
-    read_only_check: "list_styles",
+    read_only_check: readOnlyCheck,
   };
 }
 

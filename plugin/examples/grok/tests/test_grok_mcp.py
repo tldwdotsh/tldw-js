@@ -90,19 +90,31 @@ class ExampleTests(unittest.TestCase):
         self.assertEqual(tool["headers"], {"Authorization": "Bearer " + config.personal_token})
         self.assertNotIn(config.api_key, json.dumps(body))
         self.assertEqual(set(tool["allowed_tools"]), set(grok.READ_ONLY_TOOLS))
-        self.assertTrue({"wait_job", "get_comparison"}.issubset(tool["allowed_tools"]))
+        self.assertIn("wait_job", tool["allowed_tools"])
         self.assertFalse(body["store"])
         self.assertNotIn("require_approval", tool)
         self.assertFalse(
             set(tool["allowed_tools"])
             & {
-                "submit_video",
-                "compare_tiktoks",
-                "cancel_comparison",
-                "create_share",
+                "analyze_media",
+                "extract_transcript",
+                "submit_subtitles",
                 "cancel_job",
-                "create_support_ticket",
+                "mark_transcript_read",
             }
+        )
+        self.assertEqual(
+            set(grok.READ_ONLY_TOOLS),
+            {
+                "account_usage",
+                "list_jobs",
+                "get_job",
+                "wait_job",
+                "get_summary",
+                "get_transcript",
+                "list_transcripts",
+                "get_saved_transcript",
+            },
         )
         self.assertNotIn(config.api_key, repr(config))
         self.assertNotIn(config.personal_token, repr(config))

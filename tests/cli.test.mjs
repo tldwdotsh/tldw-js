@@ -39,7 +39,16 @@ function outputs() {
     },
   };
 }
-function rpcFetch({ styleError = false } = {}) {
+function rpcFetch({
+  failing = [],
+  tools = [
+    "account_usage",
+    "analyze_media",
+    "get_job",
+    "get_summary",
+    "list_jobs",
+  ],
+} = {}) {
   const calls = [];
   const fetchImpl = async (url, options) => {
     const body = JSON.parse(options.body);
@@ -54,16 +63,12 @@ function rpcFetch({ styleError = false } = {}) {
     if (body.method === "notifications/initialized")
       return new Response(null, { status: 202 });
     if (body.method === "tools/list")
-      result = {
-        tools: ["analyze_media", "get_job", "get_summary", "list_styles"].map(
-          (name) => ({ name }),
-        ),
-      };
+      result = { tools: tools.map((name) => ({ name })) };
     if (body.method === "tools/call")
       result = {
         content: [],
-        structuredContent: { items: ["standard"] },
-        isError: styleError,
+        structuredContent: { items: [] },
+        isError: failing.includes(body.params.name),
       };
     return Response.json({ jsonrpc: "2.0", id: body.id, result });
   };
@@ -242,7 +247,7 @@ test("init handles shell-sensitive output paths without executing native command
   assert.equal(shellQuote("folder's plugin"), "'folder'\"'\"'s plugin'");
 });
 
-test("doctor uses only initialize, list and list_styles against one pinned endpoint", async () => {
+test("doctor uses only initialize, list and account_usage against one pinned endpoint", async () => {
   const { calls, fetchImpl } = rpcFetch();
   const result = await checkMcp({
     apiUrl: API,
@@ -250,7 +255,8 @@ test("doctor uses only initialize, list and list_styles against one pinned endpo
     fetchImpl,
   });
   assert(result.connected);
-  assert.equal(result.tools_available, 4);
+  assert.equal(result.tools_available, 5);
+  assert.equal(result.read_only_check, "account_usage");
   assert(
     calls.every(
       (call) =>
@@ -263,11 +269,68 @@ test("doctor uses only initialize, list and list_styles against one pinned endpo
     calls.map((call) => call.body.method),
     ["initialize", "notifications/initialized", "tools/list", "tools/call"],
   );
-  assert.equal(calls.at(-1).body.params.name, "list_styles");
+  assert.equal(calls.at(-1).body.params.name, "account_usage");
+});
+
+test("doctor falls back to list_jobs when account_usage is rejected or absent", async () => {
+  const rejected = rpcFetch({ failing: ["account_usage"] });
+  const result = await checkMcp({
+    apiUrl: API,
+    token: "fixture-token",
+    fetchImpl: rejected.fetchImpl,
+  });
+  assert.equal(result.read_only_check, "list_jobs");
+  const called = rejected.calls
+    .filter((call) => call.body.method === "tools/call")
+    .map((call) => call.body.params.name);
+  assert.deepEqual(called, ["account_usage", "list_jobs"]);
+  assert(
+    rejected.calls.every(
+      (call) =>
+        call.body.method !== "tools/call" ||
+        !["analyze_media", "extract_transcript", "cancel_job"].includes(
+          call.body.params.name,
+        ),
+    ),
+  );
+  const absent = rpcFetch({
+    tools: ["analyze_media", "get_job", "get_summary", "list_jobs"],
+  });
+  const fallback = await checkMcp({
+    apiUrl: API,
+    token: "fixture-token",
+    fetchImpl: absent.fetchImpl,
+  });
+  assert.equal(fallback.read_only_check, "list_jobs");
+  assert.equal(
+    absent.calls.filter((call) => call.body.method === "tools/call").length,
+    1,
+  );
+});
+
+test("doctor does not require hidden legacy tools", async () => {
+  const { fetchImpl } = rpcFetch({
+    tools: ["analyze_media", "get_job", "get_summary"],
+  });
+  await assert.rejects(
+    checkMcp({ apiUrl: API, token: "fixture-token", fetchImpl }),
+    { code: "MCP_CHECK_FAILED" },
+  );
+  const missing = rpcFetch({
+    tools: ["analyze_media", "get_job", "list_jobs"],
+  });
+  await assert.rejects(
+    checkMcp({
+      apiUrl: API,
+      token: "fixture-token",
+      fetchImpl: missing.fetchImpl,
+    }),
+    { code: "MCP_TOOLS_MISSING" },
+  );
 });
 
 test("doctor rejects protocol failures and authorization errors without source execution", async () => {
-  const { fetchImpl } = rpcFetch({ styleError: true });
+  const { fetchImpl } = rpcFetch({ failing: ["account_usage", "list_jobs"] });
   await assert.rejects(
     checkMcp({ apiUrl: API, token: "fixture-token", fetchImpl }),
     {

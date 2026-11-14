@@ -25,19 +25,18 @@ does not reset account usage.
 
 The web app's `/agents` page provides a configured package command that downloads
 the CLI from the operator, verifies its SHA-256 checksum and runs only the
-verified local file. Never install a similarly named package from a public
-registry instead. Its CLI `init` prepares a new local plugin directory and
+verified local file. The SDKs are also published as npm `@tldw/client` and PyPI
+`tldw-client`; never install a similarly named package. Its CLI `init` prepares a new local plugin directory and
 prints native client commands; it does not write a key, change global settings
 or install itself into a client. Respect its refusal to overwrite existing work.
 The CLI's `doctor` checks the REST/MCP connection without submitting processing.
 Browser verification remains a human step and no package command bypasses it.
 
-Have the user create an API key in **API keys**. Media analysis, video summaries and
-TikTok comparisons normally need jobs:write, jobs:read and summaries:read. Media
+Have the user create an API key in **API keys**. Media analysis and video summaries
+normally need jobs:write, jobs:read and summaries:read. Media
 submission returns a job receipt; poll get_job, then fetch get_summary only after
 completion. Status access alone does not expose content.
-Add account:read for usage, both chat scopes for later questions, and uploads:write
-for subtitle ingestion. Additional scopes depend on the requested feature.
+Add account:read for usage and uploads:write for subtitle ingestion. Additional scopes depend on the requested feature.
 
 Keep the key in a client-supported secret store or `TLDW_API_TOKEN`, never in
 this conversation, a committed file, a manifest or command arguments. REST sends
@@ -64,10 +63,13 @@ client's connection interface and let its browser flow handle login and permissi
 approval. Reuse an existing authorized connection; never request access tokens,
 refresh tokens or OAuth client secrets in chat.
 
-Verify MCP initialization and tool discovery, then call `list_styles` as a
-read-only connection check. The current server exposes 29 tools. Use
-`account_usage` only with account:read. Do not submit processing work, contact
-support or publish content merely to test setup. A connection check does not
+Verify MCP initialization and tool discovery, then call `account_usage` as a
+read-only connection check; it needs account:read, so for a key without it call
+`list_jobs` instead. Production MCP exposes 13 tools: `account_usage`,
+`analyze_media`, `extract_transcript`, `get_job`, `wait_job`, `list_jobs`,
+`cancel_job`, `get_summary`, `get_transcript`, `list_transcripts`,
+`get_saved_transcript`, `mark_transcript_read` and `submit_subtitles`. Do not
+submit processing work or publish content merely to test setup. A connection check does not
 verify production transcription, AI quality or payments.
 
 For the operator's explicitly enabled local development profile, a native client
@@ -79,9 +81,8 @@ your laptop's localhost. Keep the separate private `DEV_ADMIN_KEY` in the local
 operator UI; never put it in a distributed plugin. Production uses a scoped key.
 
 For TRIAL_ACTIVATION_REQUIRED, direct the user back to the signed-in browser.
-For TRIAL_PAUSED or TRIAL_EXHAUSTED, purchased credits or a paid plan can fund more
-work; buying credits requires the web app. Honor trial length, batch, attempt and
-conversation limits. For SIGNUP_REQUIRED or HUMAN_VERIFICATION_REQUIRED, direct
+For TRIAL_PAUSED or TRIAL_EXHAUSTED, a paid plan can fund more work; choosing a
+plan requires the web app. Honor trial length, attempt and conversation limits. For SIGNUP_REQUIRED or HUMAN_VERIFICATION_REQUIRED, direct
 the user to the web app's one-time Cloudflare verification. Never evade access or
 usage limits with new accounts or tokens.
 
@@ -89,8 +90,8 @@ For 401, check expiry/revocation and whether the client inherited the environmen
 value without printing it. For scope errors, name the required scope. For network
 errors, confirm the exact HTTPS API/MCP endpoint and client transport support.
 Use plain HTTP only with a loopback development server the user controls. For an
-authorized summary or comparison test, preserve custom instructions, a stable
-idempotency key and the returned job/comparison ID. analyze_media is always
+authorized summary test, preserve custom instructions, a stable idempotency key
+and the returned job ID. analyze_media is always
 asynchronous; get_job reports progress, and get_summary returns successful output.
 Legacy optional bounded waits do not cancel processing when their wait ends.
 

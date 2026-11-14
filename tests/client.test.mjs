@@ -9,7 +9,6 @@ import {
 
 const jobId = "00000000-0000-4000-8000-000000000101";
 const summaryId = "00000000-0000-4000-8000-000000000102";
-const comparisonId = "00000000-0000-4000-8000-000000000103";
 const token = "tldw_fixture_not_a_real_secret";
 const transcriptId = "00000000-0000-4000-8000-000000000104";
 const job = (status = "queued", extra = {}) => ({
@@ -272,6 +271,24 @@ test("polling follows real progress and fetches output only after completion", a
   assert.equal(done.summary_id, summaryId);
   assert.deepEqual(seen, ["summarizing", "completed"]);
 });
+test("a job queued for a concurrency slot is not terminal; the wait continues", async () => {
+  let polls = 0;
+  const seen = [];
+  const client = make(async () =>
+    response(
+      ++polls === 1
+        ? job("queued_for_slot", { queue_position: 1, max_concurrent_jobs: 1 })
+        : job("completed"),
+    ),
+  );
+  const done = await client.waitForJob(jobId, {
+    pollIntervalMs: 250,
+    onProgress: (value) => seen.push(value.status),
+  });
+  assert.equal(done.summary_id, summaryId);
+  assert.deepEqual(seen, ["queued_for_slot", "completed"]);
+  assert.equal((await make(async () => response(job("queued_for_slot"))).getJob(jobId)).status, "queued_for_slot");
+});
 test("wait honors Retry-After and server next_poll_after_ms without excessive polling", async () => {
   let calls = 0;
   const client = make(async () => {
@@ -368,39 +385,10 @@ test("a malformed completed job cannot fetch arbitrary paths", async () => {
   await assert.rejects(client.getJob("../admin"), TypeError);
   assert.equal(calls.length, 1);
 });
-test("comparison helpers unwrap envelopes and require result access", async () => {
-  const comparison = {
-    id: comparisonId,
-    status: "completed",
-    result: {
-      summary: "Compared speech",
-      findings: [],
-      limitations: ["Sample only"],
-    },
-  };
-  const client = make(async () => response({ comparison }));
-  assert.equal(
-    (
-      await client.compareTikToks([
-        "https://www.tiktok.com/@a/video/123",
-        "https://www.tiktok.com/@a/video/124",
-      ])
-    ).id,
-    comparisonId,
-  );
-  assert.equal(
-    (await client.waitForComparison(comparisonId)).result.summary,
-    "Compared speech",
-  );
-  const restricted = make(async () =>
-    response({ comparison: { ...comparison, result: null } }),
-  );
-  await assert.rejects(
-    restricted.waitForComparison(comparisonId),
-    (error) =>
-      error.code === "RESULT_SCOPE_REQUIRED" &&
-      error.comparisonId === comparisonId,
-  );
+test("client exposes no comparison methods", () => {
+  const client = make(async () => response({}));
+  for (const name of ["compareTikToks", "getComparison", "waitForComparison"])
+    assert.equal(name in client, false, name);
 });
 test("oversized and non-JSON API output fails safely", async () => {
   const huge = make(
@@ -455,22 +443,6 @@ test("spending permission and decimal ceiling reach REST without implicit ASR co
   );
 });
 
-test("comparison forwards one aggregate cap without multiplying it by URL count", async () => {
-  let body;
-  const client = make(async (_url, init) => {
-    body = JSON.parse(init.body);
-    return response(
-      { comparison: { id: comparisonId, status: "queued" } },
-      202,
-    );
-  });
-  await client.compareTikToks(
-    ["https://www.tiktok.com/@a/video/1", "https://www.tiktok.com/@a/video/2"],
-    { transcription: "if_needed", maxCredits: 10 },
-  );
-  assert.equal(body.max_credits, "10");
-  assert.equal(body.transcription, "if_needed");
-});
 test("omitted transcription caps reach the authenticated server without an account lookup", async () => {
   const calls = [];
   const client = make(async (url, init) => {
