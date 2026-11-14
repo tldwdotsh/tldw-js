@@ -32,14 +32,16 @@ function client(calls) {
                 ? "2026-01-10T12:00:00Z"
                 : null,
             }
-          : new URL(url).pathname === "/v1/transcripts"
-            ? { items: [{ id }], next_cursor: "next+cursor/==" }
-            : {
-                ...content,
-                total_segments: 1,
-                total_blocks: 0,
-                next_offset: null,
-              };
+          : new URL(url).pathname.endsWith("/metadata")
+            ? { id, video: { id }, unread: true }
+            : new URL(url).pathname === "/v1/transcripts"
+              ? { items: [{ id }], next_cursor: "next+cursor/==" }
+              : {
+                  ...content,
+                  total_segments: 1,
+                  total_blocks: 0,
+                  next_offset: null,
+                };
       return new Response(JSON.stringify(value), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -95,6 +97,7 @@ test("invalid catalog options never send an HTTP request", async () => {
   ])
     await assert.rejects(sdk.listTranscripts(options), TypeError);
   await assert.rejects(sdk.getSavedTranscript("not-an-id"), TypeError);
+  await assert.rejects(sdk.getSavedTranscriptMetadata("not-an-id"), TypeError);
   await assert.rejects(
     sdk.getSavedTranscriptPage(id, { offset: -1 }),
     TypeError,
@@ -105,4 +108,31 @@ test("invalid catalog options never send an HTTP request", async () => {
   );
   await assert.rejects(sdk.markTranscriptRead(id, "true"), TypeError);
   assert.equal(calls.length, 0);
+});
+
+test("metadata lookup reads one source without fetching text or marking read", async () => {
+  const calls = [];
+  const sdk = client(calls);
+  const metadata = await sdk.getSavedTranscriptMetadata(id);
+  assert.equal(metadata.id, id);
+  assert.equal(metadata.unread, true);
+  assert.equal("segments" in metadata, false);
+  assert.deepEqual(
+    calls.map((call) => [call.method, call.url.pathname]),
+    [["GET", `/v1/transcripts/${id}/metadata`]],
+  );
+});
+
+test("metadata lookup rejects a mismatched source response", async () => {
+  const sdk = new TldwClient({
+    apiUrl: "https://api.example.test",
+    token: "fixture",
+    fetch: async () =>
+      new Response(
+        JSON.stringify({ id: "other", unread: true, video: { id } }),
+      ),
+  });
+  await assert.rejects(sdk.getSavedTranscriptMetadata(id), {
+    code: "INVALID_RESPONSE",
+  });
 });

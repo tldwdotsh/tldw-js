@@ -682,6 +682,24 @@ export class TldwClient {
     );
     return this.#transcript(data);
   }
+  async getSavedTranscriptMetadata(transcriptId, { signal } = {}) {
+    transcriptId = identifier(transcriptId);
+    const { data } = await this.#request(
+      "GET",
+      `/v1/transcripts/${transcriptId}/metadata`,
+      { signal },
+    );
+    if (
+      data.id !== transcriptId ||
+      typeof data.unread !== "boolean" ||
+      !data.video ||
+      typeof data.video.id !== "string"
+    )
+      throw new TldwError("API returned invalid transcript metadata.", {
+        code: "INVALID_RESPONSE",
+      });
+    return data;
+  }
   async getSavedTranscriptPage(
     transcriptId,
     { offset = 0, limit = 100, signal } = {},

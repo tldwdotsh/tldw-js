@@ -13,9 +13,9 @@ page. Download it, verify it against the SHA-256 checksum shown on that page,
 then install the verified local file:
 
 ```sh
-curl -fsSLo tldw-client-0.2.5.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.5.tgz' &&
-  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.5.tgz' | shasum -a 256 -c - &&
-  npm install ./tldw-client-0.2.5.tgz
+curl -fsSLo tldw-client-0.2.6.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.6.tgz' &&
+  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.6.tgz' | shasum -a 256 -c - &&
+  npm install ./tldw-client-0.2.6.tgz
 ```
 
 Only `@tldw/client` on npm and your operator's verified download are this
@@ -232,6 +232,9 @@ Pass `cursor: page.next_cursor` with the same filters for older entries. `since`
 is inclusive and `until` exclusive, using ISO 8601 timestamps against
 `last_requested_at`. `markTranscriptRead(id, false)` marks a source unread again.
 Reading source content through REST/MCP/SDK never implicitly changes its read state.
+Use `getSavedTranscriptMetadata(id)` to read one source’s title, dates and unread
+status directly, including sources outside the current catalog page. This GET
+does not load the transcript body or start a processing job.
 
 X posts, X video captions and articles reuse an owned source snapshot for 24 hours.
 Use `submitAnalysis(media, { refreshSource: true })` to retrieve current source content.

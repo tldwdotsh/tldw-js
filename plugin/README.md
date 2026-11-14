@@ -42,7 +42,7 @@ repository does not deploy or verify that hosted service.
 
 Open your operator's **Connect your agent** page (`/agents`) for the exact install
 command, download origin and SHA-256 checksum. The downloadable
-`tldw-client-0.2.5.tgz` contains a dependency-free Node client, CLI and this
+`tldw-client-0.2.6.tgz` contains a dependency-free Node client, CLI and this
 reviewed plugin. Install it only from your operator's download URL; do not
 substitute a package name from a public registry.
 
@@ -53,9 +53,9 @@ then run the verified local file:
 ```sh
 # Use the exact HTTPS app/API origins and SHA-256 shown in your account.
 # Do not put keys in flags.
-curl -fsSLo tldw-client-0.2.5.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.5.tgz' &&
-  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.5.tgz' | shasum -a 256 -c - &&
-  npx --yes ./tldw-client-0.2.5.tgz init \
+curl -fsSLo tldw-client-0.2.6.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.6.tgz' &&
+  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.6.tgz' | shasum -a 256 -c - &&
+  npx --yes ./tldw-client-0.2.6.tgz init \
     --api-url 'https://YOUR_API_ORIGIN' --web-url 'https://YOUR_APP_ORIGIN' \
     --dir ./tldw-agent-plugin
 ```
@@ -69,7 +69,7 @@ MCP URLs. It refuses an existing destination or symlink parent, stores no key an
 does not modify global settings or execute a native plugin install. Follow its
 Claude Code/Codex commands or the client examples below. Configure the private
 `TLDW_API_TOKEN` environment through your secret manager, then run
-`npx --yes ./tldw-client-0.2.5.tgz doctor --api-url 'https://YOUR_API_ORIGIN'`
+`npx --yes ./tldw-client-0.2.6.tgz doctor --api-url 'https://YOUR_API_ORIGIN'`
 from the same directory as the verified file. Doctor checks REST/MCP with
 read-only requests; it never submits inference, sends support messages or consumes
 an analysis. `account:read` is optional for its usage check.

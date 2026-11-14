@@ -268,6 +268,11 @@ export class TldwClient {
     transcriptId: string,
     options?: { signal?: AbortSignal },
   ): Promise<TranscriptContent>;
+  /** Read metadata by ID without loading the body, starting work or marking read. */
+  getSavedTranscriptMetadata(
+    transcriptId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<SavedTranscript>;
   getSavedTranscriptPage(
     transcriptId: string,
     options?: { offset?: number; limit?: number; signal?: AbortSignal },
