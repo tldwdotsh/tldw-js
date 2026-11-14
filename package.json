@@ -1,6 +1,6 @@
 {
   "name": "@tldw/client",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Dependency-free tldw.sh async analysis client and agent setup tools",
   "type": "module",
   "license": "MIT",

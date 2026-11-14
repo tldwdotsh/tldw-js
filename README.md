@@ -13,9 +13,9 @@ page. Download it, verify it against the SHA-256 checksum shown on that page,
 then install the verified local file:
 
 ```sh
-curl -fsSLo tldw-client-0.2.7.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.7.tgz' &&
-  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.7.tgz' | shasum -a 256 -c - &&
-  npm install ./tldw-client-0.2.7.tgz
+curl -fsSLo tldw-client-0.2.8.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.8.tgz' &&
+  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.8.tgz' | shasum -a 256 -c - &&
+  npm install ./tldw-client-0.2.8.tgz
 ```
 
 Only `@tldw/client` on npm and your operator's verified download are this
@@ -214,7 +214,6 @@ transcript job has `output_mode: "transcript"`, `transcript_id`, and no
 and a full source read, returning `{ receipt, job, transcript }`; timeout and
 source-permission errors retain the accepted receipt and job ID.
 
-For a parsed subtitle upload, use `submitTranscript(null, { uploadId })`.
 `preferredCaptionLanguages` selects original captions. Extraction accepts
 spending/ASR controls and `refreshSource`, but no analysis instructions.
 Submission requires `jobs:write`, polling `jobs:read`, and source reads
@@ -346,6 +345,11 @@ credits reset monthly. Agents cannot buy credits, and reading account usage does
 not change plans.
 
 Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `TRANSCRIPTION_NOT_ALLOWED` (HTTP 422); `MAX_CREDITS_EXCEEDED` (HTTP 422) means a supplied ceiling is invalid or below the required charge. Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.
+
+## Changes in 0.2.8
+
+Customer subtitle uploads are no longer supported. `submitTranscript()` and
+`extractTranscript()` no longer accept `uploadId` and always need `media`.
 
 ## Changes in 0.2.7
 

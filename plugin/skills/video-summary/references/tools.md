@@ -3,16 +3,15 @@
 The SaaS checks scopes and ownership on every tool call. Names
 omit client-specific prefixes. The `tldw://guide` resource accepts any active
 personal API key; it is not an additional tool. Production MCP exposes exactly
-these 13 tools:
+these 12 tools:
 
-| Tools                                                        | Required scope               |
-| ------------------------------------------------------------ | ---------------------------- |
-| account_usage                                                | account:read                 |
-| analyze_media, extract_transcript, cancel_job                | jobs:write                   |
-| get_job, wait_job, list_jobs                                 | jobs:read                    |
-| get_summary, get_transcript                                  | summaries:read               |
-| list_transcripts, get_saved_transcript, mark_transcript_read | summaries:read               |
-| submit_subtitles                                             | uploads:write and jobs:write |
+| Tools                                                        | Required scope |
+| ------------------------------------------------------------ | -------------- |
+| account_usage                                                | account:read   |
+| analyze_media, extract_transcript, cancel_job                | jobs:write     |
+| get_job, wait_job, list_jobs                                 | jobs:read      |
+| get_summary, get_transcript                                  | summaries:read |
+| list_transcripts, get_saved_transcript, mark_transcript_read | summaries:read |
 
 Embedded summary results require summaries:read in addition to the
 submission or status scope. Write-only access can submit work without exposing
@@ -35,8 +34,7 @@ identical idempotent replays create no additional processing charge.
 
 ## Extract original source without an LLM
 
-Call `extract_transcript` with `media` (raw text, URL or source object), or an
-owned parsed subtitle `upload_id`. Supply exactly one. Optional
+Call `extract_transcript` with `media` (raw text, URL or source object). Optional
 `preferred_caption_languages` chooses captions in their original language;
 spending/ASR controls and `refresh_source` match analysis jobs. There is no
 `instructions` or `wait_seconds` argument and no summary or LLM call.
@@ -105,8 +103,7 @@ See [copyable source examples](../../../examples/media/README.md).
 
 ## Bounded waits and retries
 
-`submit_subtitles` and `wait_job` default to an 8-second wait; 0–10 seconds is
-supported. Read an embedded `result` when present; otherwise preserve `job_id`
+`wait_job` defaults to an 8-second wait; 0–10 seconds is supported. Read an embedded `result` when present; otherwise preserve `job_id`
 and call `wait_job` or `get_job` with that ID. Honor `next_poll_after_ms`. A
 timeout ends only the wait. A terminal receipt can be completed, failed or
 canceled. Completed jobs carry `summary_id` for `get_summary`.

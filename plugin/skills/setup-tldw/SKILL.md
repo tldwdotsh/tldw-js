@@ -36,7 +36,7 @@ Have the user create an API key in **API keys**. Media analysis and video summar
 normally need jobs:write, jobs:read and summaries:read. Media
 submission returns a job receipt; poll get_job, then fetch get_summary only after
 completion. Status access alone does not expose content.
-Add account:read for usage and uploads:write for subtitle ingestion. Additional scopes depend on the requested feature.
+Add account:read for usage. Additional scopes depend on the requested feature.
 
 Keep the key in a client-supported secret store or `TLDW_API_TOKEN`, never in
 this conversation, a committed file, a manifest or command arguments. REST sends
@@ -65,10 +65,10 @@ refresh tokens or OAuth client secrets in chat.
 
 Verify MCP initialization and tool discovery, then call `account_usage` as a
 read-only connection check; it needs account:read, so for a key without it call
-`list_jobs` instead. Production MCP exposes 13 tools: `account_usage`,
+`list_jobs` instead. Production MCP exposes 12 tools: `account_usage`,
 `analyze_media`, `extract_transcript`, `get_job`, `wait_job`, `list_jobs`,
 `cancel_job`, `get_summary`, `get_transcript`, `list_transcripts`,
-`get_saved_transcript`, `mark_transcript_read` and `submit_subtitles`. Do not
+`get_saved_transcript` and `mark_transcript_read`. Do not
 submit processing work or publish content merely to test setup. A connection check does not
 verify production transcription, AI quality or payments.
 

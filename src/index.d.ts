@@ -151,8 +151,6 @@ export type TranscriptSubmitOptions = Omit<
   AnalysisSubmitOptions,
   "instructions"
 > & {
-  /** Supply with media=null to reuse your completed subtitle upload. */
-  uploadId?: string;
   preferredCaptionLanguages?: string[];
 };
 export interface WaitOptions<T = Job> {
@@ -213,11 +211,11 @@ export class TldwClient {
   ): Promise<AnalysisAccepted>;
   /** Save original captions/source text without generating an analysis or invoking an LLM. */
   submitTranscript(
-    media: Media | null,
+    media: Media,
     options?: TranscriptSubmitOptions,
   ): Promise<TranscriptAccepted>;
   extractTranscript(
-    media: Media | null,
+    media: Media,
     options?: TranscriptSubmitOptions & WaitOptions,
   ): Promise<{
     receipt: TranscriptAccepted;

@@ -453,7 +453,6 @@ export class TldwClient {
       idempotencyKey,
       signal,
       refreshSource,
-      uploadId,
       preferredCaptionLanguages,
       ...spending
     } = {},
@@ -461,9 +460,7 @@ export class TldwClient {
     if (refreshSource !== undefined && typeof refreshSource !== "boolean")
       throw new TypeError("refreshSource must be a boolean.");
     if (path === "/v1/transcripts") {
-      if ((media != null) === (uploadId !== undefined))
-        throw new TypeError("Provide exactly one media or uploadId.");
-      if (uploadId !== undefined) uploadId = identifier(uploadId, "Upload ID");
+      if (media == null) throw new TypeError("Provide media.");
       if (
         preferredCaptionLanguages !== undefined &&
         (!Array.isArray(preferredCaptionLanguages) ||
@@ -484,9 +481,7 @@ export class TldwClient {
     try {
       ({ data, retryAfterMs } = await this.#request("POST", path, {
         body: {
-          ...(path === "/v1/transcripts" && uploadId !== undefined
-            ? { upload_id: uploadId }
-            : { media }),
+          media,
           ...(path === "/v1/transcripts" &&
           preferredCaptionLanguages !== undefined
             ? { preferred_caption_languages: preferredCaptionLanguages }

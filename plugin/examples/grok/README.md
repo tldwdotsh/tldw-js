@@ -16,7 +16,7 @@ installing. Supply `TLDW_API_TOKEN` from your secret manager or private shell
 environment. A local Grok Build process can use a loopback endpoint such as `http://localhost:8000/mcp`.
 API keys come from **API keys** in the web app; use the minimum scopes needed.
 For custom summaries and transcripts, use `jobs:write`, `jobs:read` and `summaries:read`. Add
-`account:read` for allowance checks, `uploads:write` for subtitles, and
+`account:read` for allowance checks and
 `chat:write`/`chat:read` for queued video questions. Never use a provider API key
 or Clerk session as the SaaS token.
 

@@ -1,4 +1,4 @@
-# tldw.sh agent plugin · 0.8.6
+# tldw.sh agent plugin · 0.8.7
 
 **Too long; didn't watch.** Connect with a scoped tldw.sh API key from any HTTP
 client, script or agent.
@@ -42,7 +42,7 @@ repository does not deploy or verify that hosted service.
 
 Open your operator's **Connect your agent** page (`/agents`) for the exact install
 command, download origin and SHA-256 checksum. The downloadable
-`tldw-client-0.2.7.tgz` contains a dependency-free Node client, CLI and this
+`tldw-client-0.2.8.tgz` contains a dependency-free Node client, CLI and this
 reviewed plugin. The same client is published as npm `@tldw/client`; for the
 plugin installer, use your operator's download URL and do not substitute a
 similarly named package.
@@ -54,9 +54,9 @@ then run the verified local file:
 ```sh
 # Use the exact HTTPS app/API origins and SHA-256 shown in your account.
 # Do not put keys in flags.
-curl -fsSLo tldw-client-0.2.7.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.7.tgz' &&
-  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.7.tgz' | shasum -a 256 -c - &&
-  npx --yes ./tldw-client-0.2.7.tgz init \
+curl -fsSLo tldw-client-0.2.8.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.8.tgz' &&
+  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.8.tgz' | shasum -a 256 -c - &&
+  npx --yes ./tldw-client-0.2.8.tgz init \
     --api-url 'https://YOUR_API_ORIGIN' --web-url 'https://YOUR_APP_ORIGIN' \
     --dir ./tldw-agent-plugin
 ```
@@ -70,7 +70,7 @@ MCP URLs. It refuses an existing destination or symlink parent, stores no key an
 does not modify global settings or execute a native plugin install. Follow its
 Claude Code/Codex commands or the client examples below. Configure the private
 `TLDW_API_TOKEN` environment through your secret manager, then run
-`npx --yes ./tldw-client-0.2.7.tgz doctor --api-url 'https://YOUR_API_ORIGIN'`
+`npx --yes ./tldw-client-0.2.8.tgz doctor --api-url 'https://YOUR_API_ORIGIN'`
 from the same directory as the verified file. Doctor checks REST/MCP with
 read-only requests; it never submits inference, sends support messages or consumes
 an analysis. `account:read` is optional for its usage check.
@@ -110,8 +110,7 @@ Use a new stable idempotency key when changing instructions or language.
    once in the browser, completing the configured account/bot verification.
    Agents reuse that activated account without a CAPTCHA on each request.
 3. Create an API key in **API keys**. Start with `jobs:write`, `jobs:read`
-   and `summaries:read` for summaries. Add `account:read` for usage and
-   `uploads:write` for subtitles.
+   and `summaries:read` for summaries. Add `account:read` for usage.
 4. Make `TLDW_API_TOKEN` available to the client process through your secret
    manager or private shell environment. Keep the actual value out of prompts,
    tracked files, command arguments and public archives. This is a **tldw.sh
@@ -162,7 +161,7 @@ read-only tools. They mirror the `READ_ONLY_TOOLS` allowlist enforced by the
 `get_transcript`, `list_transcripts`, `get_saved_transcript`
 
 Require approval for every other tool: `analyze_media`, `extract_transcript`,
-`submit_subtitles`, `cancel_job` and `mark_transcript_read`. Least-privilege keys help
+`cancel_job` and `mark_transcript_read`. Least-privilege keys help
 too: a key with only `jobs:read`, `summaries:read` and optionally `account:read`
 cannot start processing at all.
 
@@ -328,7 +327,6 @@ alone does not establish that its host application supports MCP or plugins.
 - Read owned transcripts in pages with `get_transcript`, `list_transcripts` and
   `get_saved_transcript`. A follow-up question is a new `analyze_media` job with
   the question as `instructions`.
-- Submit SRT/VTT text with the additional upload scope only when requested.
 
 The packaged skill's
 [scope reference](skills/video-summary/references/tools.md) lists the tools and

@@ -5,7 +5,6 @@ import { runCli } from "../src/cli.mjs";
 
 const jobId = "00000000-0000-4000-8000-000000000101";
 const transcriptId = "00000000-0000-4000-8000-000000000102";
-const uploadId = "00000000-0000-4000-8000-000000000103";
 const completed = {
   id: jobId,
   status: "completed",
@@ -66,15 +65,14 @@ test("extracts original source without summary work or server-returned URL navig
   assert.equal(calls[0].headers["Idempotency-Key"], "extract-once");
 });
 
-test("passes upload ownership, caption preferences and explicit ASR spending controls", async () => {
+test("passes caption preferences and explicit ASR spending controls", async () => {
   const calls = [];
   const sdk = client(async (url, init) => {
     assert.equal(url, "https://api.example.test/v1/transcripts");
     calls.push(JSON.parse(init.body));
     return response(accepted, 202);
   });
-  await sdk.submitTranscript(null, {
-    uploadId,
+  await sdk.submitTranscript("https://youtu.be/dQw4w9WgXcQ", {
     preferredCaptionLanguages: ["es", "en-US"],
   });
   await sdk.submitTranscript("https://x.com/user/status/1234567890", {
@@ -84,7 +82,7 @@ test("passes upload ownership, caption preferences and explicit ASR spending con
     refreshSource: true,
   });
   assert.deepEqual(calls[0], {
-    upload_id: uploadId,
+    media: "https://youtu.be/dQw4w9WgXcQ",
     preferred_caption_languages: ["es", "en-US"],
   });
   assert.deepEqual(calls[1], {
@@ -105,8 +103,6 @@ test("rejects analysis instructions and ambiguous extraction inputs before submi
   for (const [media, options] of [
     ["source", { instructions: "Summarize this" }],
     [null, {}],
-    ["source", { uploadId }],
-    [null, { uploadId: "https://bad.example" }],
     ["source", { preferredCaptionLanguages: ["invalid tag"] }],
     ["source", { refreshSource: "true" }],
     ["source", { forceAsr: true }],

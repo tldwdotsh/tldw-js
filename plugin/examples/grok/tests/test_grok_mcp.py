@@ -98,7 +98,6 @@ class ExampleTests(unittest.TestCase):
             & {
                 "analyze_media",
                 "extract_transcript",
-                "submit_subtitles",
                 "cancel_job",
                 "mark_transcript_read",
             }

@@ -1,6 +1,6 @@
 {
   "name": "tldw",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "description": "Analyze text, X posts and articles, YouTube and TikTok with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
   "author": {
     "name": "tldw.sh contributors"
