@@ -33,6 +33,7 @@ export class TldwError extends Error {
       retryAfterMs = null,
       jobId = null,
       comparisonId = null,
+      details = null,
     } = {},
   ) {
     super(message);
@@ -44,6 +45,7 @@ export class TldwError extends Error {
       retryAfterMs,
       jobId,
       comparisonId,
+      details,
     });
   }
 }
@@ -338,9 +340,18 @@ export class TldwClient {
           },
           ...(payload !== undefined ? { body: payload } : {}),
           signal: controller.signal,
-          redirect: "error",
+          // Never follow a redirect; report it instead of retrying it as a network failure.
+          redirect: "manual",
           cache: "no-store",
         });
+        if (
+          response.type === "opaqueredirect" ||
+          (response.status >= 300 && response.status < 400)
+        )
+          throw new TldwError(
+            `The API answered with a redirect (${response.status}); redirects are not followed. Check apiUrl.`,
+            { status: response.status || null, code: "HTTP_ERROR" },
+          );
         const retryAfterMs = retryDelay(response.headers.get("retry-after"));
         let data;
         try {
@@ -351,6 +362,13 @@ export class TldwClient {
         }
         if (!response.ok) {
           const detail = data?.error;
+          // Recovery data such as the active job_id or required_scope.
+          const extra =
+            detail?.details &&
+            typeof detail.details === "object" &&
+            !Array.isArray(detail.details)
+              ? safeErrorResource(detail.details, this.#token)
+              : null;
           const redact = (value) =>
             typeof value === "string" && this.#token
               ? value.replaceAll(this.#token, "[REDACTED]")
@@ -372,6 +390,11 @@ export class TldwClient {
                   : response.headers.get("x-request-id"),
               ),
               retryAfterMs,
+              details: extra,
+              jobId:
+                typeof extra?.job_id === "string" && UUID.test(extra.job_id)
+                  ? extra.job_id
+                  : null,
             },
           );
           if (!TRANSIENT.has(response.status) || attempt === 3) throw error;
@@ -387,14 +410,22 @@ export class TldwClient {
         if (signal?.aborted) throw abortError(signal);
         if (error instanceof TldwError) throw error;
         // A POST is retried only with the exact body and a stable idempotency key.
-        if (expired || Date.now() >= operationDeadline)
+        // A slow read (for example one poll inside a long wait) is retried while
+        // the caller's deadline allows; it has no side effects.
+        if (Date.now() >= operationDeadline || (expired && method !== "GET"))
           throw new TldwTimeoutError(
-            "The API request timed out. Retry submission with the same idempotency key if its outcome is unknown.",
+            method === "GET"
+              ? "The API request timed out. Accepted work continues on the server."
+              : "The API request timed out. Retry submission with the same idempotency key if its outcome is unknown.",
           );
-        lastError = new TldwError(
-          "Could not reach the configured tldw API. Check the connection before retrying.",
-          { code: "NETWORK_ERROR" },
-        );
+        lastError = expired
+          ? new TldwTimeoutError(
+              "The API request timed out. Accepted work continues on the server.",
+            )
+          : new TldwError(
+              "Could not reach the configured tldw API. Check the connection before retrying.",
+              { code: "NETWORK_ERROR" },
+            );
         if (attempt === 3) throw lastError;
         retry = Math.min(10_000, 500 * 2 ** attempt);
       } finally {
@@ -409,27 +440,87 @@ export class TldwClient {
     }
     throw lastError;
   }
-  async submitAnalysis(
+  async submitAnalysis(media, options = {}) {
+    return this.#submitMedia("/v1/analyses", media, options);
+  }
+  /** Extract original source only; no summary or LLM work is requested. */
+  async submitTranscript(media, options = {}) {
+    if (options.instructions !== undefined)
+      throw new TypeError(
+        "Transcript extraction does not accept analysis instructions.",
+      );
+    return this.#submitMedia("/v1/transcripts", media, options);
+  }
+  async #submitMedia(
+    path,
     media,
-    { instructions, idempotencyKey, signal, ...spending } = {},
+    {
+      instructions,
+      idempotencyKey,
+      signal,
+      refreshSource,
+      uploadId,
+      preferredCaptionLanguages,
+      ...spending
+    } = {},
   ) {
+    if (refreshSource !== undefined && typeof refreshSource !== "boolean")
+      throw new TypeError("refreshSource must be a boolean.");
+    if (path === "/v1/transcripts") {
+      if ((media != null) === (uploadId !== undefined))
+        throw new TypeError("Provide exactly one media or uploadId.");
+      if (uploadId !== undefined) uploadId = identifier(uploadId, "Upload ID");
+      if (
+        preferredCaptionLanguages !== undefined &&
+        (!Array.isArray(preferredCaptionLanguages) ||
+          preferredCaptionLanguages.length > 10 ||
+          preferredCaptionLanguages.some(
+            (value) =>
+              typeof value !== "string" ||
+              !/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(value),
+          ))
+      )
+        throw new TypeError(
+          "preferredCaptionLanguages must contain at most 10 BCP-47 language tags.",
+        );
+    }
     const limits = spendingOptions(spending);
     const stableKey = key(idempotencyKey);
     let data, retryAfterMs;
     try {
-      ({ data, retryAfterMs } = await this.#request("POST", "/v1/analyses", {
+      ({ data, retryAfterMs } = await this.#request("POST", path, {
         body: {
-          media,
+          ...(path === "/v1/transcripts" && uploadId !== undefined
+            ? { upload_id: uploadId }
+            : { media }),
+          ...(path === "/v1/transcripts" &&
+          preferredCaptionLanguages !== undefined
+            ? { preferred_caption_languages: preferredCaptionLanguages }
+            : {}),
           ...(instructions !== undefined ? { instructions } : {}),
+          ...(refreshSource !== undefined
+            ? { refresh_source: refreshSource }
+            : {}),
           ...limits,
         },
         signal,
         idempotencyKey: stableKey,
       }));
-      identifier(data.job_id, "Accepted job ID");
+      if (typeof data.job_id !== "string" || !UUID.test(data.job_id))
+        throw new TldwError("The API returned an invalid accepted job ID.", {
+          code: "INVALID_RESPONSE",
+        });
       object(data.job, "accepted job");
       if (data.job.id !== data.job_id)
         throw new TldwError("Accepted job IDs do not match.", {
+          code: "INVALID_RESPONSE",
+        });
+      if (
+        path === "/v1/transcripts" &&
+        (data.output_mode !== "transcript" ||
+          data.job.output_mode !== "transcript")
+      )
+        throw new TldwError("API returned a non-transcript extraction job.", {
           code: "INVALID_RESPONSE",
         });
       this.#rememberPollHint(
@@ -471,7 +562,9 @@ export class TldwClient {
       !JOB_STATES.has(data.status) ||
       !Number.isInteger(data.progress) ||
       data.progress < 0 ||
-      data.progress > 100
+      data.progress > 100 ||
+      (data.output_mode !== undefined &&
+        !["summary", "analysis", "transcript"].includes(data.output_mode))
     )
       throw new TldwError("API returned an invalid job.", {
         code: "INVALID_RESPONSE",
@@ -479,12 +572,22 @@ export class TldwClient {
       });
     if (
       data.status === "completed" &&
-      (!data.summary_id || !UUID.test(data.summary_id))
+      (typeof (data.output_mode === "transcript"
+        ? data.transcript_id
+        : data.summary_id) !== "string" ||
+        !UUID.test(
+          data.output_mode === "transcript"
+            ? data.transcript_id
+            : data.summary_id,
+        ))
     )
-      throw new TldwError("Completed job has no valid summary ID.", {
-        code: "INVALID_RESPONSE",
-        jobId: id,
-      });
+      throw new TldwError(
+        `Completed job has no valid ${data.output_mode === "transcript" ? "transcript" : "summary"} ID.`,
+        {
+          code: "INVALID_RESPONSE",
+          jobId: id,
+        },
+      );
     return data;
   }
   async getSummary(id, { signal } = {}) {
@@ -505,6 +608,112 @@ export class TldwClient {
   }
   async getUsage({ signal } = {}) {
     return (await this.#request("GET", "/v1/me", { signal })).data;
+  }
+  /** Fetch saved source text separately; never follows URLs from a job/result. */
+  async getTranscript(summaryId, { signal } = {}) {
+    summaryId = identifier(summaryId);
+    const { data } = await this.#request(
+      "GET",
+      `/v1/summaries/${summaryId}/transcript`,
+      { signal },
+    );
+    return this.#transcript(data);
+  }
+  #transcript(data) {
+    object(data, "transcript");
+    if (
+      typeof data.transcript_id !== "string" ||
+      !UUID.test(data.transcript_id) ||
+      typeof data.timed !== "boolean" ||
+      typeof data.source !== "string" ||
+      (data.language !== null && typeof data.language !== "string") ||
+      !Array.isArray(data.segments) ||
+      !Array.isArray(data.blocks) ||
+      (data.timed ? data.text !== null : typeof data.text !== "string")
+    )
+      throw new TldwError("API returned an invalid transcript.", {
+        code: "INVALID_RESPONSE",
+      });
+    return data;
+  }
+  async listTranscripts({
+    limit = 50,
+    cursor,
+    since,
+    until,
+    unreadOnly = false,
+    signal,
+  } = {}) {
+    integer(limit, "limit", 1, 100);
+    if (typeof unreadOnly !== "boolean")
+      throw new TypeError("unreadOnly must be a boolean.");
+    const query = new URLSearchParams({
+      limit: String(limit),
+      unread_only: String(unreadOnly),
+    });
+    for (const [name, value] of Object.entries({ cursor, since, until })) {
+      if (value === undefined) continue;
+      if (
+        typeof value !== "string" ||
+        !value ||
+        value.length > (name === "cursor" ? 1024 : 128)
+      )
+        throw new TypeError(`${name} must be a bounded non-empty string.`);
+      query.set(name, value);
+    }
+    const { data } = await this.#request("GET", `/v1/transcripts?${query}`, {
+      signal,
+    });
+    if (
+      !Array.isArray(data.items) ||
+      (data.next_cursor !== null && typeof data.next_cursor !== "string")
+    )
+      throw new TldwError("API returned an invalid transcript list.", {
+        code: "INVALID_RESPONSE",
+      });
+    return data;
+  }
+  async getSavedTranscript(transcriptId, { signal } = {}) {
+    transcriptId = identifier(transcriptId);
+    const { data } = await this.#request(
+      "GET",
+      `/v1/transcripts/${transcriptId}`,
+      { signal },
+    );
+    return this.#transcript(data);
+  }
+  async getSavedTranscriptPage(
+    transcriptId,
+    { offset = 0, limit = 100, signal } = {},
+  ) {
+    transcriptId = identifier(transcriptId);
+    integer(offset, "offset", 0, 1_000_000_000);
+    integer(limit, "limit", 1, 500);
+    const { data } = await this.#request(
+      "GET",
+      `/v1/transcripts/${transcriptId}/page?offset=${offset}&limit=${limit}`,
+      { signal },
+    );
+    return this.#transcript(data);
+  }
+  async markTranscriptRead(transcriptId, read = true, { signal } = {}) {
+    transcriptId = identifier(transcriptId);
+    if (typeof read !== "boolean")
+      throw new TypeError("read must be a boolean.");
+    const { data } = await this.#request(
+      "PATCH",
+      `/v1/transcripts/${transcriptId}/read`,
+      { body: { read }, signal },
+    );
+    if (
+      data.id !== transcriptId ||
+      typeof data.unread !== "boolean" ||
+      (data.read_at !== null && typeof data.read_at !== "string")
+    )
+      throw new TldwError("API returned an invalid transcript read state.", {
+        code: "INVALID_RESPONSE",
+      });
+    return data;
   }
   async waitForJob(id, options = {}) {
     return this.#wait(identifier(id), "job", options);
@@ -582,8 +791,41 @@ export class TldwClient {
     const receipt = await this.submitAnalysis(media, options);
     try {
       const job = await this.waitForJob(receipt.job_id, options);
+      if (job.output_mode === "transcript")
+        throw new TldwError(
+          "Expected an analysis result, received a transcript job.",
+          { code: "INVALID_RESPONSE" },
+        );
       const summary = await this.getSummary(job.summary_id, options);
       return { receipt, job, summary };
+    } catch (error) {
+      if (error && typeof error === "object") {
+        error.jobId = receipt.job_id;
+        error.receipt = safeErrorResource(receipt, this.#token);
+      }
+      throw error;
+    }
+  }
+  async extractTranscript(media, options = {}) {
+    integer(options.timeoutMs ?? 180_000, "timeoutMs", 1, 3_600_000);
+    integer(options.pollIntervalMs ?? 1500, "pollIntervalMs", 250, 30_000);
+    if (
+      options.onProgress !== undefined &&
+      typeof options.onProgress !== "function"
+    )
+      throw new TypeError("onProgress must be a function.");
+    const receipt = await this.submitTranscript(media, options);
+    try {
+      const job = await this.waitForJob(receipt.job_id, options);
+      if (job.output_mode !== "transcript")
+        throw new TldwError("Expected a transcript extraction result.", {
+          code: "INVALID_RESPONSE",
+        });
+      const transcript = await this.getSavedTranscript(
+        job.transcript_id,
+        options,
+      );
+      return { receipt, job, transcript };
     } catch (error) {
       if (error && typeof error === "object") {
         error.jobId = receipt.job_id;
@@ -611,7 +853,11 @@ export class TldwClient {
         signal,
         idempotencyKey: stableKey,
       }));
-      const id = identifier(data.comparison?.id, "Comparison ID");
+      const id = data.comparison?.id;
+      if (typeof id !== "string" || !UUID.test(id))
+        throw new TldwError("The API returned an invalid comparison ID.", {
+          code: "INVALID_RESPONSE",
+        });
       this.#rememberPollHint(
         id,
         "comparison",

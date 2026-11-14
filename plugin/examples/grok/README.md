@@ -7,10 +7,13 @@ plugin, shared workflow skills and remote MCP configuration. This does not insta
 a plugin into the Grok web chat. See the official
 [plugin compatibility guide](https://docs.x.ai/build/features/skills-plugins-marketplaces).
 
-Set `TLDW_MCP_URL` to your service's full MCP endpoint and supply
-`TLDW_API_TOKEN` from your secret manager or private shell environment. A
-published service uses `https://api.tldw.invalid/mcp` with your actual API
-host substituted. A local Grok Build process can reach `http://localhost:8000/mcp`.
+The plugin's MCP endpoint is a fixed literal in `.mcp.json`, never an
+environment override, so no other process setting can redirect your token to a
+different host. Use a directory prepared by the operator's verified CLI `init`
+command, which writes your API origin into every configuration. For an
+unconfigured source copy, replace its reserved `.invalid` origin before
+installing. Supply `TLDW_API_TOKEN` from your secret manager or private shell
+environment. A local Grok Build process can use a loopback endpoint such as `http://localhost:8000/mcp`.
 API keys come from **API keys** in the web app; use the minimum scopes needed.
 For custom summaries and TikTok comparisons, use `jobs:write`, `jobs:read` and `summaries:read`. Add
 `account:read` for allowance checks, `uploads:write` for subtitles, and
@@ -18,10 +21,12 @@ For custom summaries and TikTok comparisons, use `jobs:write`, `jobs:read` and `
 or Clerk session as the SaaS token.
 
 Existing API keys remain valid after the tldw.sh rebrand. This package uses
-`TLDW_*` variables and the MCP label `tldw`. For an existing native configuration,
-rename the private environment variables when switching packages and avoid
-duplicate server entries. The optional Python example also accepts legacy
-`YT2ALPHA_API_TOKEN` / `YT2ALPHA_MCP_URL` when the new variables are absent.
+`TLDW_API_TOKEN` and the MCP label `tldw`. Native plugin configuration no longer
+reads `TLDW_MCP_URL`; remove it from launch environments that only served the
+plugin. For an existing native configuration, avoid duplicate server entries.
+The optional Python example below still reads a validated `TLDW_MCP_URL` and also
+accepts legacy `YT2ALPHA_API_TOKEN` / `YT2ALPHA_MCP_URL` when the new variables
+are absent.
 
 From the parent of the extracted repository:
 
@@ -36,7 +41,9 @@ discovery and `grok mcp doctor tldw` to check connectivity. Plugin validation
 does not prove credentials or SaaS processing work.
 
 For MCP only, merge [`grok-config.example.toml`](grok-config.example.toml) into
-your own Grok config. Do not overwrite unrelated settings. Alternatively:
+your own Grok config after replacing its reserved `.invalid` origin with your
+operator's HTTPS API origin. Do not overwrite unrelated settings. Alternatively,
+with the same literal endpoint substituted:
 
 ```sh
 grok mcp add --transport http tldw \
@@ -45,6 +52,7 @@ grok mcp add --transport http tldw \
 ```
 
 The single quotes preserve the token placeholder; Grok expands it at load time.
+Keep the endpoint literal; do not make it an environment expansion.
 Use one connection method to avoid duplicate tools. Remove the MCP-only connection
 with `grok mcp remove tldw`. See the official
 [MCP settings](https://docs.x.ai/build/features/mcp-servers).

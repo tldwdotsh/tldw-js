@@ -1,4 +1,11 @@
-export type Media = string | Record<string, unknown>;
+export type Media = string | XMedia | Record<string, unknown>;
+/** Explicit X source. Omit scope (or use auto) to detect attached video captions. */
+export interface XMedia {
+  type: "x";
+  url: string;
+  /** post is text-only; thread does not recursively analyze attached videos. */
+  scope?: "auto" | "post" | "thread" | "article";
+}
 export interface JobCredits {
   billing_exempt?: boolean;
   estimated: number | string | null;
@@ -24,6 +31,9 @@ export interface Job {
     | "canceled";
   progress: number;
   summary_id?: string | null;
+  output_mode?: "summary" | "analysis" | "transcript";
+  transcript_id?: string | null;
+  transcript_url?: string | null;
   error?: { code: string; message: string } | null;
   next_poll_after_ms?: number | null;
   credits?: JobCredits;
@@ -39,12 +49,81 @@ export interface AnalysisAccepted {
   result_url?: string | null;
   next_poll_after_ms?: number | null;
   replayed?: boolean;
+  output_mode?: "summary" | "analysis" | "transcript";
+  transcript_id?: string | null;
+  transcript_url?: string | null;
+}
+export interface TranscriptAccepted extends AnalysisAccepted {
+  output_mode: "transcript";
+  job: Job & { output_mode: "transcript" };
 }
 export interface Summary<TContent = Record<string, unknown>> {
   id: string;
   content: TContent;
   is_demo?: boolean;
   [key: string]: unknown;
+}
+export interface TranscriptContent {
+  transcript_id: string;
+  language: string | null;
+  source: string;
+  /** X post context and captions use blocks; caption blocks retain timestamps. */
+  timed: boolean;
+  segments: Array<{
+    start_ms: number;
+    end_ms: number;
+    text: string;
+    speaker?: string | null;
+  }>;
+  blocks: Array<{
+    id: string;
+    label: string;
+    text: string;
+    url?: string | null;
+    start_s?: number | null;
+    end_s?: number | null;
+  }>;
+  text: string | null;
+}
+export interface TranscriptPage extends TranscriptContent {
+  total_segments: number;
+  total_blocks: number;
+  next_offset: number | null;
+}
+export interface SavedTranscript {
+  id: string;
+  video: {
+    id: string;
+    platform: "youtube" | "tiktok" | "upload" | "text" | "x" | "article";
+    platform_video_id: string;
+    url: string | null;
+    title: string | null;
+    channel_name: string | null;
+    duration_ms: number | null;
+    thumbnail_url: string | null;
+  };
+  source: string;
+  language: string | null;
+  provider: string;
+  content_kind: "timed" | "text";
+  has_timestamps: boolean;
+  segment_count: number;
+  block_count: number;
+  duration_ms: number;
+  created_at: string;
+  first_requested_at: string;
+  last_requested_at: string;
+  read_at: string | null;
+  unread: boolean;
+}
+export interface TranscriptList {
+  items: SavedTranscript[];
+  next_cursor: string | null;
+}
+export interface TranscriptReadResult {
+  id: string;
+  read_at: string | null;
+  unread: boolean;
 }
 export interface Comparison {
   id: string;
@@ -75,6 +154,7 @@ export interface Comparison {
   [key: string]: unknown;
 }
 export interface SubmitOptions {
+  /** Analysis focus, format or output language; e.g. "Summarize in Spanish." */
   instructions?: string;
   idempotencyKey?: string;
   signal?: AbortSignal;
@@ -85,6 +165,18 @@ export interface SubmitOptions {
   /** Requires explicit transcription=if_needed and server-authorized ASR access. */
   forceAsr?: boolean;
 }
+export interface AnalysisSubmitOptions extends SubmitOptions {
+  /** Fetch current X/article content instead of reusing a source saved within 24 hours. Does not force ASR. */
+  refreshSource?: boolean;
+}
+export type TranscriptSubmitOptions = Omit<
+  AnalysisSubmitOptions,
+  "instructions"
+> & {
+  /** Supply with media=null to reuse your completed subtitle upload. */
+  uploadId?: string;
+  preferredCaptionLanguages?: string[];
+};
 export interface WaitOptions<T = Job> {
   timeoutMs?: number;
   pollIntervalMs?: number;
@@ -105,6 +197,7 @@ export interface ErrorDetails {
   retryAfterMs?: number | null;
   jobId?: string | null;
   comparisonId?: string | null;
+  details?: Record<string, unknown> | null;
 }
 export class TldwError extends Error {
   constructor(message: string, details?: ErrorDetails);
@@ -114,6 +207,8 @@ export class TldwError extends Error {
   retryAfterMs: number | null;
   jobId: string | null;
   comparisonId: string | null;
+  /** Redacted `error.details` from the API, e.g. `{ job_id }` or `{ required_scope }`. */
+  details: Record<string, unknown> | null;
   idempotencyKey?: string;
   receipt?: AnalysisAccepted;
 }
@@ -134,20 +229,61 @@ export class TldwClient {
   readonly requestTimeoutMs: number;
   submitAnalysis(
     media: Media,
-    options?: SubmitOptions,
+    options?: AnalysisSubmitOptions,
   ): Promise<AnalysisAccepted>;
+  /** Save original captions/source text without generating an analysis or invoking an LLM. */
+  submitTranscript(
+    media: Media | null,
+    options?: TranscriptSubmitOptions,
+  ): Promise<TranscriptAccepted>;
+  extractTranscript(
+    media: Media | null,
+    options?: TranscriptSubmitOptions & WaitOptions,
+  ): Promise<{
+    receipt: TranscriptAccepted;
+    job: Job;
+    transcript: TranscriptContent;
+  }>;
   getJob(id: string, options?: { signal?: AbortSignal }): Promise<Job>;
   getSummary<TContent = Record<string, unknown>>(
     id: string,
     options?: { signal?: AbortSignal },
   ): Promise<Summary<TContent>>;
+  getTranscript(
+    summaryId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<TranscriptContent>;
+  /** Metadata only, ordered by latest owned request. Does not mark read. */
+  listTranscripts(options?: {
+    limit?: number;
+    cursor?: string;
+    /** Inclusive latest-request ISO 8601 timestamp. */
+    since?: string;
+    /** Exclusive latest-request ISO 8601 timestamp. */
+    until?: string;
+    unreadOnly?: boolean;
+    signal?: AbortSignal;
+  }): Promise<TranscriptList>;
+  getSavedTranscript(
+    transcriptId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<TranscriptContent>;
+  getSavedTranscriptPage(
+    transcriptId: string,
+    options?: { offset?: number; limit?: number; signal?: AbortSignal },
+  ): Promise<TranscriptPage>;
+  markTranscriptRead(
+    transcriptId: string,
+    read?: boolean,
+    options?: { signal?: AbortSignal },
+  ): Promise<TranscriptReadResult>;
   getUsage(options?: {
     signal?: AbortSignal;
   }): Promise<Record<string, unknown>>;
   waitForJob(id: string, options?: WaitOptions): Promise<Job>;
   analyze<TContent = Record<string, unknown>>(
     media: Media,
-    options?: SubmitOptions & WaitOptions,
+    options?: AnalysisSubmitOptions & WaitOptions,
   ): Promise<{
     receipt: AnalysisAccepted;
     job: Job;

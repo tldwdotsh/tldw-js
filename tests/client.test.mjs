@@ -11,6 +11,7 @@ const jobId = "00000000-0000-4000-8000-000000000101";
 const summaryId = "00000000-0000-4000-8000-000000000102";
 const comparisonId = "00000000-0000-4000-8000-000000000103";
 const token = "tldw_fixture_not_a_real_secret";
+const transcriptId = "00000000-0000-4000-8000-000000000104";
 const job = (status = "queued", extra = {}) => ({
   id: jobId,
   status,
@@ -37,6 +38,68 @@ function make(fetch, options = {}) {
     ...options,
   });
 }
+
+test("fetches saved transcripts separately, including timed video and X source blocks", async () => {
+  for (const timed of [true, false]) {
+    const source = {
+      transcript_id: transcriptId,
+      language: "en",
+      source: "platform_auto",
+      timed,
+      segments: timed ? [{ start_ms: 0, end_ms: 1000, text: "Hello." }] : [],
+      blocks: timed
+        ? []
+        : [
+            {
+              id: "caption-1",
+              label: "Video captions",
+              text: "Hello.",
+              start_s: 0,
+              end_s: 1,
+            },
+          ],
+      text: timed ? null : "Hello.",
+    };
+    const client = make(async (url, init) => {
+      assert.equal(
+        url,
+        `https://api.example.test/v1/summaries/${summaryId}/transcript`,
+      );
+      assert.equal(init.method, "GET");
+      assert.equal(init.headers.Authorization, `Bearer ${token}`);
+      assert.equal(init.redirect, "manual");
+      return response(source);
+    });
+    assert.deepEqual(await client.getTranscript(summaryId), source);
+  }
+});
+
+test("transcript helpers reject URL IDs and malformed success envelopes", async () => {
+  let calls = 0;
+  const client = make(async () => {
+    calls++;
+    return response({ transcript_id: transcriptId });
+  });
+  await assert.rejects(
+    client.getTranscript("https://evil.invalid/steal"),
+    TypeError,
+  );
+  assert.equal(calls, 0);
+  await assert.rejects(
+    client.getTranscript(summaryId),
+    (e) => e.code === "INVALID_RESPONSE",
+  );
+});
+
+test("transcript authorization failures remain errors rather than source text", async () => {
+  const client = make(async () =>
+    response({ error: { code: "TOKEN_SCOPE_REQUIRED" } }, 403),
+  );
+  await assert.rejects(
+    client.getTranscript(summaryId),
+    (e) => e.code === "TOKEN_SCOPE_REQUIRED" && e.status === 403,
+  );
+});
 
 test("accepts only origins and requires an explicit local-only anonymous mode", () => {
   for (const apiUrl of [
@@ -97,7 +160,7 @@ test("uses exact async request contract and does not follow receipt URLs", async
     calls.every(
       (call) =>
         call.url.startsWith("https://api.example.test/v1/") &&
-        call.redirect === "error",
+        call.redirect === "manual",
     ),
   );
   assert.equal(JSON.stringify(client).includes(token), false);
@@ -410,15 +473,109 @@ test("comparison forwards one aggregate cap without multiplying it by URL count"
 });
 test("omitted transcription caps reach the authenticated server without an account lookup", async () => {
   const calls = [];
-  const client = make(async (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return response(receipt(), 202); });
+  const client = make(async (url, init) => {
+    calls.push({ url, body: JSON.parse(init.body) });
+    return response(receipt(), 202);
+  });
   await client.submitAnalysis("source", { transcription: "if_needed" });
   assert.equal(calls.length, 1);
   assert.ok(calls[0].url.endsWith("/v1/analyses"));
-  assert.deepEqual(calls[0].body, { media: "source", transcription: "if_needed" });
+  assert.deepEqual(calls[0].body, {
+    media: "source",
+    transcription: "if_needed",
+  });
 });
 test("ordinary account missing-cap policy errors remain actionable and are not retried", async () => {
   let calls = 0;
-  const client = make(async () => { calls++; return response({ error: { code: "MAX_CREDITS_EXCEEDED", message: "A credit ceiling is required." } }, 422); });
-  await assert.rejects(client.submitAnalysis("source", { transcription: "if_needed" }), (error) => error.code === "MAX_CREDITS_EXCEEDED" && error.status === 422);
+  const client = make(async () => {
+    calls++;
+    return response(
+      {
+        error: {
+          code: "TRANSCRIPTION_NOT_ALLOWED",
+          message: "A credit ceiling is required.",
+        },
+      },
+      422,
+    );
+  });
+  await assert.rejects(
+    client.submitAnalysis("source", { transcription: "if_needed" }),
+    (error) =>
+      error.code === "TRANSCRIPTION_NOT_ALLOWED" && error.status === 422,
+  );
   assert.equal(calls, 1);
+});
+
+test("API error details are exposed, redacted, and give the active job ID", async () => {
+  const activeId = "00000000-0000-4000-8000-000000000199";
+  const client = make(async () =>
+    response(
+      {
+        error: {
+          code: "DUPLICATE_ACTIVE_JOB",
+          message: "That video is already processing.",
+          details: { job_id: activeId, note: `seen ${token}` },
+        },
+      },
+      409,
+    ),
+  );
+  const error = await client
+    .submitAnalysis("A complete source")
+    .catch((e) => e);
+  assert.ok(error instanceof TldwError);
+  assert.equal(error.code, "DUPLICATE_ACTIVE_JOB");
+  assert.equal(error.jobId, activeId);
+  assert.deepEqual(error.details, {
+    job_id: activeId,
+    note: "seen [REDACTED]",
+  });
+});
+
+test("one slow poll does not end a longer wait", async () => {
+  let calls = 0;
+  const client = make(
+    async (url, init) => {
+      calls++;
+      if (calls === 1)
+        return new Promise((_, reject) =>
+          init.signal.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          ),
+        );
+      return response(job("completed"));
+    },
+    { requestTimeoutMs: 50 },
+  );
+  const done = await client.waitForJob(jobId, { timeoutMs: 5000 });
+  assert.equal(done.status, "completed");
+  assert.ok(calls >= 2);
+});
+
+test("redirects are reported at once and never followed or retried", async () => {
+  let calls = 0;
+  const client = make(async () => {
+    calls++;
+    return new Response(null, {
+      status: 302,
+      headers: { Location: "https://elsewhere.example/v1/" },
+    });
+  });
+  const error = await client.getSummary(summaryId).catch((e) => e);
+  assert.ok(error instanceof TldwError);
+  assert.equal(error.code, "HTTP_ERROR");
+  assert.equal(error.status, 302);
+  assert.equal(calls, 1);
+});
+
+test("a malformed accepted job ID is an INVALID_RESPONSE error", async () => {
+  const client = make(async () =>
+    response({ ...receipt(), job_id: "../../admin" }, 202),
+  );
+  const error = await client
+    .submitAnalysis("A complete source")
+    .catch((e) => e);
+  assert.ok(error instanceof TldwError);
+  assert.equal(error.code, "INVALID_RESPONSE");
 });

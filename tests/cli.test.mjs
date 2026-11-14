@@ -107,7 +107,9 @@ test("init materializes the reviewed plugin with endpoint-only native configs an
   assert.equal(result.credentials_saved, false);
   assert.equal(result.global_settings_changed, false);
   const claude = JSON.parse(await readFile(join(target, ".mcp.json"), "utf8"));
-  assert.equal(claude.mcpServers.tldw.url, "${TLDW_MCP_URL:-" + API + "/mcp}");
+  // The endpoint is literal: no environment variable may redirect the token.
+  assert.equal(claude.mcpServers.tldw.url, API + "/mcp");
+  assert.ok(!JSON.stringify(claude).includes("TLDW_MCP_URL"));
   assert.equal(
     claude.mcpServers.tldw.headers.Authorization,
     "Bearer ${TLDW_API_TOKEN}",
@@ -411,8 +413,13 @@ test("CLI prints a generated stable key before POST and preserves it after an un
   const out = outputs();
   let submittedKey;
   class Client {
+    constructor({ fetch }) {
+      this.fetch = fetch;
+    }
     async submitAnalysis(_media, options) {
       submittedKey = options.idempotencyKey;
+      // The key is announced as the POST goes out, before any reply.
+      await this.fetch(API + "/v1/analyses", { method: "POST" });
       assert.equal(
         JSON.parse(out.lines.err.trim()).idempotency_key,
         submittedKey,
@@ -426,6 +433,7 @@ test("CLI prints a generated stable key before POST and preserves it after an un
       ...out,
       env: { TLDW_API_TOKEN: "fixture-token" },
       clientFactory: Client,
+      fetchImpl: async () => new Response(null, { status: 599 }),
     },
   );
   assert.equal(exit, 1);
@@ -434,6 +442,35 @@ test("CLI prints a generated stable key before POST and preserves it after an un
   assert.equal(events[0].event, "submission");
   assert.equal(events[1].idempotency_key, submittedKey);
   assert(!out.lines.err.includes("fixture-token"));
+});
+
+test("CLI reports invalid options without announcing an unsent submission", async () => {
+  for (const args of [
+    ["--transcription", "sometimes"],
+    ["--max-credits", "abc", "--transcription", "if_needed"],
+    ["--force-asr"],
+  ]) {
+    const out = outputs();
+    let fetched = 0;
+    const exit = await runCli(
+      ["analyze", "--api-url", API, "--media", "Source text", ...args],
+      {
+        ...out,
+        env: { TLDW_API_TOKEN: "fixture-token" },
+        fetchImpl: async () => {
+          fetched++;
+          return new Response(null, { status: 500 });
+        },
+      },
+    );
+    assert.equal(exit, 1);
+    assert.equal(fetched, 0);
+    const events = out.lines.err.trim().split("\n").map(JSON.parse);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].code, "INVALID_ARGUMENT");
+    assert.doesNotMatch(events[0].message, /did not finish/);
+    assert.equal(events[0].idempotency_key, undefined);
+  }
 });
 
 test("CLI never echoes an API token hidden in an explicit key or progress response", async () => {
@@ -492,14 +529,66 @@ test("CLI forwards explicit ASR consent and ceiling without losing them during s
       received = options;
       return { job_id: "00000000-0000-4000-8000-000000000101" };
     }
-    async waitForJob() { return { summary_id: "00000000-0000-4000-8000-000000000102" }; }
-    async getSummary() { return { content: { answer: "done" } }; }
+    async waitForJob() {
+      return { summary_id: "00000000-0000-4000-8000-000000000102" };
+    }
+    async getSummary() {
+      return { content: { answer: "done" } };
+    }
   }
-  const status = await runCli(["analyze", "--api-url", API, "--media", "https://youtu.be/dQw4w9WgXcQ", "--transcription", "if_needed", "--max-credits", "30.00", "--force-asr"], {
-    ...io, env: { TLDW_API_TOKEN: "fixture" }, clientFactory: Client,
-  });
+  const status = await runCli(
+    [
+      "analyze",
+      "--api-url",
+      API,
+      "--media",
+      "https://youtu.be/dQw4w9WgXcQ",
+      "--transcription",
+      "if_needed",
+      "--max-credits",
+      "30.00",
+      "--force-asr",
+    ],
+    {
+      ...io,
+      env: { TLDW_API_TOKEN: "fixture" },
+      clientFactory: Client,
+    },
+  );
   assert.equal(status, 0);
   assert.equal(received.transcription, "if_needed");
   assert.equal(received.maxCredits, "30.00");
   assert.equal(received.forceAsr, true);
+});
+
+test("CLI source refresh is independent of ASR permission", async () => {
+  const io = outputs();
+  let received;
+  class Client {
+    async submitAnalysis(_media, options) {
+      received = options;
+      return { job_id: "00000000-0000-4000-8000-000000000101" };
+    }
+    async waitForJob() {
+      return { summary_id: "00000000-0000-4000-8000-000000000102" };
+    }
+    async getSummary() {
+      return { content: { answer: "done" } };
+    }
+  }
+  const status = await runCli(
+    [
+      "analyze",
+      "--api-url",
+      API,
+      "--media",
+      "https://x.com/user/status/1234567890",
+      "--refresh-source",
+    ],
+    { ...io, env: { TLDW_API_TOKEN: "fixture" }, clientFactory: Client },
+  );
+  assert.equal(status, 0);
+  assert.equal(received.refreshSource, true);
+  assert.equal(received.forceAsr, undefined);
+  assert.equal(received.transcription, undefined);
 });

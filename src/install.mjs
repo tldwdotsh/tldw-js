@@ -361,7 +361,7 @@ export async function installPlugin({
     global_settings_changed: false,
     onboarding_url: appOrigin ? appOrigin + "/agents" : null,
     next_steps: [
-      "Sign up in your operator's web app and complete its one-time human verification. Free includes 500 monthly caption/text credits; Hobby and Pro add paid allowances.",
+      "Sign up in your operator's web app and complete its one-time human verification. Free includes 100 monthly caption/text credits; Hobby and Pro add paid allowances.",
       "Create a key with jobs:write, jobs:read and summaries:read; account:read is optional for usage. Keep it in TLDW_API_TOKEN or your client's secret store.",
       "Install the prepared directory through your client's plugin settings, or use the native commands below. No client command has been executed.",
       "Run doctor to check the connection without submitting an analysis. Captions/text and cached transcripts cost 1 credit/minute. Fresh ASR costs 3 and requires server-authorized access and transcription=if_needed. Ordinary paid accounts require max_credits; server-confirmed exempt accounts may omit it.",

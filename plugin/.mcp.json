@@ -2,7 +2,7 @@
   "mcpServers": {
     "tldw": {
       "type": "http",
-      "url": "${TLDW_MCP_URL:-https://api.tldw.invalid/mcp}",
+      "url": "https://api.tldw.invalid/mcp",
       "headers": { "Authorization": "Bearer ${TLDW_API_TOKEN}" }
     }
   }

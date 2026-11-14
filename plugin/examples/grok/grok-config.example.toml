@@ -1,7 +1,10 @@
 # Merge into your Grok Build config; never replace an existing configuration.
-# Native Grok expands these placeholders when loading the server.
+# The endpoint is a fixed literal so no environment value can redirect your
+# token. Replace the reserved .invalid origin with your operator's HTTPS API
+# origin (the CLI `init` command renders it for you). Only the token header is
+# expanded from your environment when Grok loads the server.
 [mcp_servers.tldw]
-url = "${TLDW_MCP_URL:-https://api.tldw.invalid/mcp}"
+url = "https://api.tldw.invalid/mcp"
 headers = { Authorization = "Bearer ${TLDW_API_TOKEN}" }
 startup_timeout_sec = 30
 tool_timeout_sec = 60

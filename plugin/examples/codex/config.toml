@@ -1,8 +1,12 @@
 # Merge this table into your chosen Codex config; do not replace unrelated settings.
 # Replace the reserved .invalid endpoint with your operator's real MCP URL.
+# Keep the endpoint literal; never point it at an environment variable.
 [mcp_servers.tldw]
 url = "https://api.tldw.invalid/mcp"
 bearer_token_env_var = "TLDW_API_TOKEN"
+# Optional read-only connection: uncomment to expose only tools that cannot start
+# work, spend credits or change state. See the README's tool-approval section.
+# enabled_tools = ["list_styles", "account_usage", "list_jobs", "get_job", "wait_job", "get_comparison", "get_summary", "get_transcript", "export_summary"]
 
 # This direct-MCP alternative is unnecessary when the plugin already supplies
 # a working tldw server. Avoid configuring duplicate connections.

@@ -80,12 +80,25 @@ def validate_cursor(files: dict[str, bytes], manifest: dict) -> None:
     server = servers["tldw"]
     if server.get("headers") != {"Authorization": "Bearer ${TLDW_API_TOKEN}"}:
         raise ValidationFailure("Cursor Authorization must use its declared user variable")
+    if not fixed_mcp_url(server.get("url", "")):
+        raise ValidationFailure("Cursor endpoint must be a fixed HTTPS URL or local loopback")
+    names = set(re.findall(r"\$\{([^}]+)\}", files["cursor.mcp.json"].decode()))
+    if names != set(properties):
+        raise ValidationFailure("Cursor MCP variables must match its manifest declarations")
+
+
+def fixed_mcp_url(url: object) -> bool:
+    """A bearer token may only be sent to a literal, reviewed /mcp endpoint.
+
+    Environment expansion such as ``${TLDW_MCP_URL:-...}`` would let any process
+    environment redirect the user's token to another host, so it is refused.
+    """
     try:
-        url = server.get("url", "")
         if (
             not isinstance(url, str)
             or "\\" in url
             or "${" in url
+            or "$" in url
             or any(char.isspace() for char in url)
         ):
             raise ValueError
@@ -113,12 +126,28 @@ def validate_cursor(files: dict[str, bytes], manifest: dict) -> None:
         ):
             raise ValueError
     except (TypeError, ValueError):
-        raise ValidationFailure(
-            "Cursor endpoint must be a fixed HTTPS URL or local loopback"
-        ) from None
-    names = set(re.findall(r"\$\{([^}]+)\}", files["cursor.mcp.json"].decode()))
-    if names != set(properties):
-        raise ValidationFailure("Cursor MCP variables must match its manifest declarations")
+        return False
+    return True
+
+
+def validate_fixed_endpoints(files: dict[str, bytes]) -> None:
+    """Every packaged MCP configuration must name a literal endpoint, never an override."""
+    for name in (".mcp.json", "codex.mcp.json", "cursor.mcp.json", "examples/cursor/mcp.json"):
+        if name not in files:
+            continue
+        servers = json.loads(files[name]).get("mcpServers", {})
+        if not isinstance(servers, dict) or not servers:
+            raise ValidationFailure("MCP configuration must declare its reviewed server")
+        for server in servers.values():
+            if not isinstance(server, dict) or not fixed_mcp_url(server.get("url")):
+                raise ValidationFailure("MCP endpoints must be fixed HTTPS URLs or local loopback")
+    for name, data in files.items():
+        if name.endswith(".toml"):
+            for value in re.findall(r'^\s*url\s*=\s*"([^"]*)"', data.decode(), re.M):
+                if not fixed_mcp_url(value):
+                    raise ValidationFailure(
+                        "MCP endpoints must be fixed HTTPS URLs or local loopback"
+                    )
 
 
 def load_tree(root: Path) -> tuple[dict[str, bytes], dict]:
@@ -224,7 +253,8 @@ def load_tree(root: Path) -> tuple[dict[str, bytes], dict]:
 
 def main() -> int:
     try:
-        _, report = load_tree(Path(__file__).resolve().parents[1])
+        files, report = load_tree(Path(__file__).resolve().parents[1])
+        validate_fixed_endpoints(files)
     except (OSError, ValidationFailure):
         print(
             json.dumps(
