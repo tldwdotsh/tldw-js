@@ -5,24 +5,26 @@ The REST endpoint is `POST /v1/analyses`. Its body contains
 MCP also accepts `idempotency_key`; `analyze_media` has no `wait_seconds` argument.
 
 The accompanying [pasted-text body](text.request.json) needs no source-retrieval
-credential. The [X thread body](x-thread.request.json) needs the operator's X API
-access; its URL is a placeholder. An unavailable or incomplete thread is reported
+credential. The [X thread body](x-thread.request.json) uses the service's configured X
+retrieval; its URL is a placeholder. An unavailable or incomplete thread is reported
 as such. Paste the full authorized source text instead when fetching is unavailable.
 
 ```json
 {
   "media": {
-    "type": "article",
-    "url": "https://example.org/article"
+    "type": "x",
+    "url": "https://x.com/i/article/1234567890",
+    "scope": "article"
   },
   "instructions": "Extract the surprising claims and explain the evidence for each."
 }
 ```
 
-YouTube and TikTok URLs work through the same endpoint. For an explicit X post,
-thread or article, set `type: "x"` and `scope: "post"`, `"thread"` or `"article"`.
-For a public web article, use `type: "article"` and the operator's configured
-article extractor. Never put credentials in the source body or instruction brief.
+YouTube URLs work through the same endpoint. For an explicit X post,
+thread or X Article, set `type: "x"` and `scope: "post"`, `"thread"` or `"article"`.
+The X Article URL above is a placeholder. Generic web-article links are not
+supported; paste their text with `type: "text"` instead. Never put credentials in
+the source body or instruction brief.
 
 Use a stable `Idempotency-Key` REST header for one intended analysis. Keep the body
 and key on an unknown network outcome. REST always returns HTTP 202 with a

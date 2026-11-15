@@ -1,0 +1,4 @@
+# API-key alternative. Keep the token in your private process environment.
+[mcp_servers.tldw]
+url = "https://api.tldw.sh/mcp"
+bearer_token_env_var = "TLDW_API_TOKEN"

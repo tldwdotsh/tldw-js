@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "tldw": {
+      "url": "https://api.tldw.sh/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:TLDW_API_TOKEN}"
+      }
+    }
+  }
+}

@@ -1,9 +1,10 @@
 {
   "name": "tldw",
-  "version": "0.8.7",
-  "description": "Analyze text, X posts and articles, YouTube and TikTok with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
+  "version": "0.9.1",
+  "description": "Analyze YouTube links, public X posts and Articles, and text with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
   "author": {
-    "name": "tldw.sh contributors"
+    "name": "tldw.sh",
+    "email": "support@tldw.sh"
   },
   "license": "MIT",
   "skills": "./skills/",
@@ -11,6 +12,9 @@
   "interface": {
     "displayName": "tldw.sh",
     "shortDescription": "Too long; didn't watch. Media analysis for agents.",
-    "brandColor": "#FF4D00"
-  }
+    "brandColor": "#FF4D00",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
+  },
+  "homepage": "https://tldw.sh/agents"
 }

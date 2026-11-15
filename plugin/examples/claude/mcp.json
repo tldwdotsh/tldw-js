@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tldw": {
+      "type": "http",
+      "url": "https://api.tldw.sh/mcp"
+    }
+  }
+}

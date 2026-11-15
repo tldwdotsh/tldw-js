@@ -1,21 +1,15 @@
 {
   "name": "tldw",
-  "version": "0.8.7",
-  "description": "Analyze text, X posts and articles, YouTube and TikTok with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
-  "author": { "name": "tldw.sh contributors" },
+  "version": "0.9.1",
+  "description": "Analyze YouTube links, public X posts and Articles, and text with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
+  "author": {
+    "name": "tldw.sh",
+    "email": "support@tldw.sh"
+  },
   "license": "MIT",
   "skills": "./skills/",
   "mcpServers": "./cursor.mcp.json",
   "keywords": ["media", "summaries", "analysis", "transcripts", "mcp", "tldw"],
-  "variables": {
-    "type": "object",
-    "properties": {
-      "TLDW_API_TOKEN": {
-        "type": "string",
-        "title": "tldw.sh API key",
-        "description": "Your scoped tldw.sh account API key. Configure it privately in Cursor; never put the value in plugin files or a conversation."
-      }
-    },
-    "required": ["TLDW_API_TOKEN"]
-  }
+  "homepage": "https://tldw.sh/agents",
+  "logo": "assets/icon.png"
 }

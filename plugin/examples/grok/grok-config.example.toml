@@ -1,10 +1,3 @@
-# Merge into your Grok Build config; never replace an existing configuration.
-# The endpoint is a fixed literal so no environment value can redirect your
-# token. Replace the reserved .invalid origin with your operator's HTTPS API
-# origin (the CLI `init` command renders it for you). Only the token header is
-# expanded from your environment when Grok loads the server.
+# Merge into .grok/config.toml. Sign in from /mcps when prompted.
 [mcp_servers.tldw]
-url = "https://api.tldw.invalid/mcp"
-headers = { Authorization = "Bearer ${TLDW_API_TOKEN}" }
-startup_timeout_sec = 30
-tool_timeout_sec = 60
+url = "https://api.tldw.sh/mcp"

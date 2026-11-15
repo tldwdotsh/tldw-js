@@ -4,20 +4,21 @@ import { TldwClient, TldwTimeoutError } from "../src/index.mjs";
 import { runCli } from "../src/cli.mjs";
 
 const jobId = "00000000-0000-4000-8000-000000000101";
+const summaryId = "00000000-0000-4000-8000-000000000103";
 const transcriptId = "00000000-0000-4000-8000-000000000102";
 const completed = {
   id: jobId,
   status: "completed",
   progress: 100,
-  output_mode: "transcript",
-  summary_id: null,
+  output_mode: "analysis",
+  summary_id: summaryId,
   transcript_id: transcriptId,
   result_url: "https://untrusted.example/never-follow",
 };
 const accepted = {
   job_id: jobId,
-  job: { id: jobId, output_mode: "transcript", status: "queued", progress: 0 },
-  output_mode: "transcript",
+  job: { id: jobId, output_mode: "analysis", status: "queued", progress: 0 },
+  output_mode: "analysis",
   status_url: "https://untrusted.example/never-follow",
 };
 const source = {
@@ -38,7 +39,7 @@ function client(fetch) {
   });
 }
 
-test("extracts original source without summary work or server-returned URL navigation", async () => {
+test("analyzes once then reads original source without following returned URLs", async () => {
   const calls = [];
   const sdk = client(async (url, init) => {
     calls.push({ url, ...init });
@@ -46,7 +47,7 @@ test("extracts original source without summary work or server-returned URL navig
     if (url.endsWith(`/jobs/${jobId}`)) return response(completed);
     assert.equal(
       url,
-      `https://api.example.test/v1/transcripts/${transcriptId}`,
+      `https://api.example.test/v1/summaries/${summaryId}/transcript`,
     );
     return response(source);
   });
@@ -54,10 +55,14 @@ test("extracts original source without summary work or server-returned URL navig
     idempotencyKey: "extract-once",
   });
   assert.deepEqual(result.transcript, source);
-  assert.equal(result.job.summary_id, null);
+  assert.equal(result.job.summary_id, summaryId);
   assert.deepEqual(
     calls.map((call) => new URL(call.url).pathname),
-    ["/v1/transcripts", `/v1/jobs/${jobId}`, `/v1/transcripts/${transcriptId}`],
+    [
+      "/v1/analyses",
+      `/v1/jobs/${jobId}`,
+      `/v1/summaries/${summaryId}/transcript`,
+    ],
   );
   assert.deepEqual(JSON.parse(calls[0].body), {
     media: "https://youtu.be/dQw4w9WgXcQ",
@@ -65,49 +70,48 @@ test("extracts original source without summary work or server-returned URL navig
   assert.equal(calls[0].headers["Idempotency-Key"], "extract-once");
 });
 
-test("passes caption preferences and explicit ASR spending controls", async () => {
+test("extraction passes explicit spending controls through one analysis submission", async () => {
   const calls = [];
   const sdk = client(async (url, init) => {
-    assert.equal(url, "https://api.example.test/v1/transcripts");
-    calls.push(JSON.parse(init.body));
-    return response(accepted, 202);
+    if (init.method === "POST") {
+      assert.equal(url, "https://api.example.test/v1/analyses");
+      calls.push(JSON.parse(init.body));
+      return response(accepted, 202);
+    }
+    return response(url.includes("/jobs/") ? completed : source);
   });
-  await sdk.submitTranscript("https://youtu.be/dQw4w9WgXcQ", {
-    preferredCaptionLanguages: ["es", "en-US"],
-  });
-  await sdk.submitTranscript("https://x.com/user/status/1234567890", {
+  await sdk.extractTranscript("https://x.com/user/status/1234567890", {
     transcription: "if_needed",
     maxCredits: "9.00",
     forceAsr: true,
     refreshSource: true,
   });
-  assert.deepEqual(calls[0], {
-    media: "https://youtu.be/dQw4w9WgXcQ",
-    preferred_caption_languages: ["es", "en-US"],
-  });
-  assert.deepEqual(calls[1], {
-    media: "https://x.com/user/status/1234567890",
-    transcription: "if_needed",
-    max_credits: "9.00",
-    force_asr: true,
-    refresh_source: true,
-  });
+  assert.deepEqual(calls, [
+    {
+      media: "https://x.com/user/status/1234567890",
+      transcription: "if_needed",
+      max_credits: "9.00",
+      force_asr: true,
+      refresh_source: true,
+    },
+  ]);
+  assert.equal("submitTranscript" in sdk, false);
 });
 
-test("rejects analysis instructions and ambiguous extraction inputs before submission", async () => {
+test("rejects removed caption preferences and invalid extraction inputs before submission", async () => {
   let requests = 0;
   const sdk = client(async () => {
     requests++;
     return response(accepted, 202);
   });
   for (const [media, options] of [
-    ["source", { instructions: "Summarize this" }],
+    ["source", { preferredCaptionLanguages: [] }],
     [null, {}],
     ["source", { preferredCaptionLanguages: ["invalid tag"] }],
     ["source", { refreshSource: "true" }],
     ["source", { forceAsr: true }],
   ])
-    await assert.rejects(sdk.submitTranscript(media, options), TypeError);
+    await assert.rejects(sdk.extractTranscript(media, options), TypeError);
   assert.equal(requests, 0);
   await assert.rejects(
     sdk.extractTranscript("source", { timeoutMs: -1 }),
@@ -118,15 +122,20 @@ test("rejects analysis instructions and ambiguous extraction inputs before submi
 
 test("completed transcript jobs require transcript IDs; ordinary summary jobs still require summaries", async () => {
   for (const transcript_id of [null, "https://bad.example/source", 42]) {
-    const sdk = client(async () => response({ ...completed, transcript_id }));
+    const sdk = client(async () =>
+      response({
+        ...completed,
+        output_mode: "transcript",
+        summary_id: null,
+        transcript_id,
+      }),
+    );
     await assert.rejects(
       sdk.waitForJob(jobId),
       (error) => error.code === "INVALID_RESPONSE",
     );
   }
-  const sdk = client(async () =>
-    response({ ...completed, output_mode: "analysis" }),
-  );
+  const sdk = client(async () => response({ ...completed, summary_id: null }));
   await assert.rejects(
     sdk.waitForJob(jobId),
     (error) => error.code === "INVALID_RESPONSE",
@@ -175,17 +184,17 @@ test("an extraction wait timeout preserves accepted work without cancellation or
 
 test("invalid extraction receipt retains the stable submission key", async () => {
   const sdk = client(async () =>
-    response({ ...accepted, output_mode: "analysis" }, 202),
+    response({ ...accepted, job: { id: transcriptId } }, 202),
   );
   await assert.rejects(
-    sdk.submitTranscript("source", { idempotencyKey: "stable-key" }),
+    sdk.submitAnalysis("source", { idempotencyKey: "stable-key" }),
     (error) =>
       error.code === "INVALID_RESPONSE" &&
       error.idempotencyKey === "stable-key",
   );
 });
 
-test("CLI extract and resumed wait read transcripts without requesting a summary", async () => {
+test("CLI extract reads the analysis transcript and wait can read a saved transcript job", async () => {
   for (const args of [
     ["extract", "--media", "Original text"],
     ["wait", jobId],
@@ -194,13 +203,19 @@ test("CLI extract and resumed wait read transcripts without requesting a summary
       err = "";
     const calls = [];
     class FakeClient {
-      async submitTranscript(media, options) {
+      async submitAnalysis(media, options) {
         calls.push({ media, options });
         return accepted;
       }
       async waitForJob(id) {
         assert.equal(id, jobId);
-        return completed;
+        return args[0] === "wait"
+          ? { ...completed, output_mode: "transcript", summary_id: null }
+          : completed;
+      }
+      async getTranscript(id) {
+        assert.equal(id, summaryId);
+        return source;
       }
       async getSavedTranscript(id) {
         assert.equal(id, transcriptId);
@@ -230,7 +245,9 @@ test("CLI extract and resumed wait read transcripts without requesting a summary
     assert.equal(status, 0, err);
     assert.deepEqual(JSON.parse(out).transcript, source);
     assert.equal("summary" in JSON.parse(out), false);
-    if (args[0] === "extract")
+    if (args[0] === "extract") {
       assert.equal("instructions" in calls[0].options, false);
+      assert.equal(JSON.parse(out).summary_id, summaryId);
+    }
   }
 });

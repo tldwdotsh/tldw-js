@@ -287,7 +287,11 @@ test("a job queued for a concurrency slot is not terminal; the wait continues", 
   });
   assert.equal(done.summary_id, summaryId);
   assert.deepEqual(seen, ["queued_for_slot", "completed"]);
-  assert.equal((await make(async () => response(job("queued_for_slot"))).getJob(jobId)).status, "queued_for_slot");
+  assert.equal(
+    (await make(async () => response(job("queued_for_slot"))).getJob(jobId))
+      .status,
+    "queued_for_slot",
+  );
 });
 test("wait honors Retry-After and server next_poll_after_ms without excessive polling", async () => {
   let calls = 0;
@@ -387,8 +391,39 @@ test("a malformed completed job cannot fetch arbitrary paths", async () => {
 });
 test("client exposes no comparison methods", () => {
   const client = make(async () => response({}));
-  for (const name of ["compareTikToks", "getComparison", "waitForComparison"])
+  for (const name of ["getComparison", "waitForComparison"])
     assert.equal(name in client, false, name);
+});
+test("only supported explicit media types are admitted before POST", async () => {
+  const bodies = [];
+  const client = make(async (_url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return response(receipt(), 202);
+  });
+  for (const media of [
+    42,
+    true,
+    [],
+    { type: "legacy", url: "https://youtu.be/dQw4w9WgXcQ" },
+    { type: ["x"] },
+  ])
+    await assert.rejects(client.submitAnalysis(media), TypeError);
+  assert.equal(bodies.length, 0);
+  for (const media of [
+    "A complete supplied source",
+    "https://youtu.be/dQw4w9WgXcQ",
+    "https://x.com/example/status/1234567890",
+    { type: "youtube", url: "https://youtu.be/dQw4w9WgXcQ" },
+    {
+      type: "x",
+      url: "https://x.com/example/status/1234567890",
+      scope: "article",
+    },
+    { type: "text", text: "A complete supplied source" },
+  ]) {
+    await client.submitAnalysis(media);
+    assert.deepEqual(bodies.at(-1).media, media);
+  }
 });
 test("oversized and non-JSON API output fails safely", async () => {
   const huge = make(
@@ -432,13 +467,15 @@ test("spending permission and decimal ceiling reach REST without implicit ASR co
     client.submitAnalysis("source", { forceAsr: true }),
     TypeError,
   );
+  await client.submitAnalysis("source", { transcription: "auto" });
+  assert.deepEqual(bodies[1], { media: "source", transcription: "auto" });
   await assert.rejects(
-    client.submitAnalysis("source", { transcription: "auto" }),
+    client.submitAnalysis("source", { transcription: "sometimes" }),
     TypeError,
   );
   assert.equal(
     bodies.length,
-    1,
+    2,
     "invalid limits must not submit processing work",
   );
 });

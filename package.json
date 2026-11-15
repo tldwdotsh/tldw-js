@@ -1,9 +1,27 @@
 {
-  "name": "@tldw/client",
-  "version": "0.2.8",
+  "bin": {
+    "tldw": "./bin/tldw.mjs"
+  },
+  "bugs": {
+    "url": "https://github.com/tldwdotsh/tldw-js/issues"
+  },
   "description": "Dependency-free tldw.sh async analysis client and agent setup tools",
-  "type": "module",
-  "license": "MIT",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "exports": {
+    ".": {
+      "import": "./src/index.mjs",
+      "types": "./src/index.d.ts"
+    }
+  },
+  "files": [
+    "src",
+    "bin",
+    "plugin",
+    "README.md",
+    "LICENSE"
+  ],
   "homepage": "https://tldw.sh/agents",
   "keywords": [
     "tldw",
@@ -14,39 +32,21 @@
     "async",
     "api"
   ],
+  "license": "MIT",
+  "name": "@tldw/client",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
-  },
-  "engines": {
-    "node": ">=20.11.0"
-  },
-  "types": "./src/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./src/index.d.ts",
-      "import": "./src/index.mjs"
-    }
-  },
-  "bin": {
-    "tldw": "./bin/tldw.mjs"
-  },
-  "files": [
-    "src",
-    "bin",
-    "plugin",
-    "README.md",
-    "LICENSE"
-  ],
-  "scripts": {
-    "test": "node --test tests/*.test.mjs",
-    "build": "node scripts/build.mjs"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tldwdotsh/tldw-js.git"
   },
-  "bugs": {
-    "url": "https://github.com/tldwdotsh/tldw-js/issues"
-  }
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "type": "module",
+  "types": "./src/index.d.ts",
+  "version": "0.2.11"
 }

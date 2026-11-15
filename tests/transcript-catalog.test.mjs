@@ -33,11 +33,14 @@ function client(calls) {
                 : null,
             }
           : new URL(url).pathname.endsWith("/metadata")
-            ? { id, video: { id }, unread: true }
+            ? { id, video: { id, platform: "legacy" }, unread: true }
             : new URL(url).pathname === "/v1/transcripts"
               ? { items: [{ id }], next_cursor: "next+cursor/==" }
               : {
                   ...content,
+                  segments: new URL(url).pathname.endsWith("/page")
+                    ? []
+                    : content.segments,
                   total_segments: 1,
                   total_blocks: 0,
                   next_offset: null,
@@ -116,6 +119,7 @@ test("metadata lookup reads one source without fetching text or marking read", a
   const metadata = await sdk.getSavedTranscriptMetadata(id);
   assert.equal(metadata.id, id);
   assert.equal(metadata.unread, true);
+  assert.equal(metadata.video.platform, "legacy");
   assert.equal("segments" in metadata, false);
   assert.deepEqual(
     calls.map((call) => [call.method, call.url.pathname]),

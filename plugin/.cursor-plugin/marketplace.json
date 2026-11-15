@@ -1,0 +1,14 @@
+{
+  "name": "tldw",
+  "owner": {
+    "name": "tldw.sh",
+    "email": "support@tldw.sh"
+  },
+  "plugins": [
+    {
+      "name": "tldw",
+      "source": "./",
+      "description": "Transcripts and summaries for your agents."
+    }
+  ]
+}

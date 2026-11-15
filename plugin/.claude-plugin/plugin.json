@@ -1,10 +1,17 @@
 {
   "name": "tldw",
-  "version": "0.8.7",
-  "description": "Analyze text, X posts and articles, YouTube and TikTok with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
+  "version": "0.9.1",
+  "description": "Analyze YouTube links, public X posts and Articles, and text with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
   "author": {
-    "name": "tldw.sh contributors"
+    "name": "tldw.sh",
+    "email": "support@tldw.sh"
   },
   "license": "MIT",
-  "keywords": ["media", "summaries", "analysis", "transcripts", "mcp", "tldw"]
+  "keywords": ["media", "summaries", "analysis", "transcripts", "mcp", "tldw"],
+  "homepage": "https://tldw.sh/agents",
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://tldw.sh/docs",
+  "supportUrl": "https://tldw.sh/support",
+  "privacyPolicyUrl": "https://tldw.sh/privacy",
+  "termsOfServiceUrl": "https://tldw.sh/terms"
 }

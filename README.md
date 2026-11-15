@@ -1,364 +1,214 @@
-# tldw.sh client and agent tools
+# tldw.sh JavaScript client and CLI
 
-Dependency-free Node.js 20.11+ ESM client for the same durable REST jobs used by MCP and
-the sample web app. This package does not contain a media processor or provider
-credentials.
+A dependency-free client for the asynchronous tldw.sh API. Requires Node.js 20.11 or newer.
+
+## Install
 
 ```sh
 npm install @tldw/client
 ```
 
-You can instead install the versioned tarball from your operator's `/agents`
-page. Download it, verify it against the SHA-256 checksum shown on that page,
-then install the verified local file:
+This checkout prepares the **0.2.11 release candidate**. Use the reviewed,
+versioned download on [Connect your agent](https://tldw.sh/agents) for the updated
+extraction helper, X video search, job listing/cancellation and `auto`
+transcription described here. The registry command above installs the currently
+published version; it does not establish that this candidate has been published.
+Publication is a separate release step.
+Only npm `@tldw/client` is this client.
 
-```sh
-curl -fsSLo tldw-client-0.2.8.tgz 'https://YOUR_APP_ORIGIN/downloads/tldw-client-0.2.8.tgz' &&
-  echo 'SHA256_FROM_YOUR_AGENTS_PAGE  tldw-client-0.2.8.tgz' | shasum -a 256 -c - &&
-  npm install ./tldw-client-0.2.8.tgz
-```
+## Authenticate
 
-Only `@tldw/client` on npm and your operator's verified download are this
-client; similarly named packages are not. TypeScript types are included;
-CommonJS consumers can use dynamic `import("@tldw/client")`.
-
-Supply your deployment's API origin and a scoped **tldw API key** through your
-secret manager. Never put a real key in a prompt, source file, command argument,
-or checked-in client configuration. Signup and one-time human verification happen
-in the browser; processing calls stay headless.
-
-The SDK, the Claude connector, Claude Code and the skill use the same tldw.sh
-account and credits. A new API key does not add free credits. Free includes 100
-monthly caption/text credits and stops at 30 minutes per source.
+Create an account at [tldw.sh](https://tldw.sh), then create a scoped API key in
+Developers. Processing needs `jobs:write`, `jobs:read` and `summaries:read`;
+add `account:read` to call `getUsage`. Keep the key in your private runtime
+or secret store. The SDK requires an explicit `token` constructor value and
+never reads a token from the environment automatically.
 
 ```js
-import { TldwClient, TldwTimeoutError } from "@tldw/client";
+import { TldwClient } from "@tldw/client";
 
-const client = new TldwClient({
-  apiUrl: process.env.TLDW_API_URL,
-  token: process.env.TLDW_API_TOKEN,
-});
-
-// Persist a stable key before submitting; reuse it with the exact same input
-// if the submission's network outcome is unknown.
-const receipt = await client.submitAnalysis("https://youtu.be/VIDEO_ID", {
-  instructions: "Extract the argument and flag weak evidence.",
-  idempotencyKey: "my-persisted-request-001",
-});
-console.log({ jobId: receipt.job_id }); // Persist before waiting.
-try {
-  const job = await client.waitForJob(receipt.job_id, { timeoutMs: 180_000 });
-  const result = await client.getSummary(job.summary_id);
-  console.log(result.content);
-} catch (error) {
-  if (error instanceof TldwTimeoutError) {
-    console.log({
-      jobId: error.jobId,
-      status: "still-running-or-not-yet-observed",
-    });
-    // Resume later with waitForJob(error.jobId); don't submit again.
-  } else throw error;
-}
+const client = new TldwClient({ token: process.env.TLDW_API_TOKEN });
 ```
 
-The `analyze(media, options)` convenience helper combines those calls and returns
-`{ receipt, job, summary }`. A failure after acceptance carries `error.jobId` and
-`error.receipt`. A submission failure carries `error.idempotencyKey`, including
-when the SDK generated the key. Preserve it before retrying an unknown outcome.
+The origin defaults to `https://api.tldw.sh`. Set `TLDW_API_URL` or pass
+`apiUrl` to override it. Origins must use HTTPS, have no credentials, query,
+fragment or path. Explicit anonymous development requires a loopback origin
+and `allowAnonymous: true`.
 
-## Three prompts
+## Analyze media
 
-Each is one link and one job: submit, keep the job ID, wait, then read.
+Analyze YouTube links, public X posts with video or Articles, and supplied text.
 
 ```js
-const media = "https://youtu.be/VIDEO_ID";
-// YouTube research brief. Cost: 1 credit per caption minute. A 20-minute talk is 20 credits. Reading the saved result again is free.
-const brief = await client.submitAnalysis(media, {
-  instructions: "Main argument and three useful takeaways. Cite the minute for each.",
-  idempotencyKey: "brief-001",
+const result = await client.analyze("https://x.com/USER/status/POST_ID", {
+  instructions: "Explain the main claim and cite the source.",
+  maxCredits: 30,
+  idempotencyKey: "analysis-001",
 });
-// Transcript only: "Transcript only. Do not summarize." Use submitTranscript; it sends no
-// instructions. Cost: Same caption rate, no summary. Reading it again is free.
-const source = await client.submitTranscript(media, { idempotencyKey: "source-001" });
-// Claims and evidence. Cost: Same caption rate. Audio only on the platforms account_usage lists for your plan, at 3 credits a minute.
-const claims = await client.submitAnalysis(media, {
-  instructions:
-    "List practical claims, the evidence, and the caveats. Flag anything supported by one example.",
-  idempotencyKey: "claims-001",
-});
-const job = await client.waitForJob(brief.job_id);
-console.log((await client.getSummary(job.summary_id)).content);
+console.log(result.job.id, result.summary.content);
 ```
 
-## Limits that stop a job
+Omit `transcription` to let the server decide its account/source policy.
+`"auto"` explicitly selects that policy; `"never"` prevents fresh audio
+transcription, and `"if_needed"` permits it when the account and platform allow
+it. `forceAsr: true` requires explicit `transcription: "if_needed"`.
+`maxCredits` is a positive decimal ceiling with at most two decimal places.
+The server enforces access, funding and duration limits.
 
-Four limits can stop a job. `getUsage` / `get_usage` (`GET /v1/me`) returns them
-as `walls`, each with `active` for your account. A wall error carries
-`error.details.wall` and `error.details.upgrade`, with the next plan and a
-`billing_url` for the account owner, at submit time and on a failed job.
+For durable control, call `submitAnalysis(media, options)`, keep its `job_id`,
+then use `waitForJob(jobId)` and `getSummary(job.summary_id)`. X media can be
+explicit, for example `{ type: "x", url, scope: "auto" }`; `scope: "post"`
+reads post text. Generic web-article URLs are unsupported; paste their text.
+`refreshSource: true` refreshes an X source snapshot without forcing ASR.
 
-- Source length: Free stops at 30 minutes per source; paid plans allow longer
-  sources up to their plan limit.
-- Monthly credits: when included credits run out, new jobs stop until the next
-  billing period or an upgrade. Agents cannot buy credits.
-- Audio: a source without captions needs audio transcription, which runs only on
-  plans and platforms that allow it (`plan.transcription_platforms`).
-- Concurrent jobs: a job over your plan's running-job limit may wait with status
-  `queued_for_slot` and a `queue_position`. It is not terminal; the wait helpers
-  keep polling until it runs. A full queue returns HTTP 429 `RATE_LIMITED`.
-
-Methods:
-
-- `submitTranscript(media, { transcription?, maxCredits?, refreshSource?, idempotencyKey?, signal? })`
-- `submitAnalysis(media, { instructions?, transcription?, maxCredits?, forceAsr?, refreshSource?, idempotencyKey?, signal? })`
-- `getJob(jobId, { signal? })` / `getSummary(summaryId, { signal? })`
-- `waitForJob(jobId, { timeoutMs?, pollIntervalMs?, signal?, onProgress? })`
-- `analyze(media, { ...submissionOptions, ...waitOptions })`
-- `getUsage({ signal? })` requires `account:read`.
-
-Pass an `AbortSignal` to stop the client wait; it never cancels accepted work on
-the server. Waits default to 180 seconds and allow a finite maximum of one hour.
-Each HTTP operation has a separate 30-second budget (`requestTimeoutMs`, up to
-120 seconds). The client honors polling hints and Retry-After; transient
-429/502/503/504 and network failures have bounded retries. POST retries preserve
-the same serialized body and idempotency key. Authorization, scope and trial
-denials are returned to the caller without automatic resubmission.
-
-`TldwError` exposes `code`, `status`, `requestId`, `retryAfterMs` and durable IDs
-when known. `TldwJobError` marks failed/canceled work. Server-returned status and
-result URLs are never followed; the client uses validated UUIDs under the fixed
-API origin. Redirects are rejected and response bodies are size-limited.
-
-For explicitly enabled local development only, use
-`{ apiUrl: "http://localhost:8000", allowAnonymous: true }`. It cannot grant admin
-access. Hosted deployments require HTTPS and a scoped key.
-
-The bundled `tldw` command provides installation and connection checks; run
-`tldw --help` for its exact options. See the public `/agents` page for matching
-Claude Code, Codex and generic MCP instructions. Provider credentials and payment
-configuration remain operator-only and are not part of this package.
-
-From a source checkout, run protocol and installer checks with `npm test`. Reference workflows are
-distributed separately from the same deployment.
-
-## Standalone development and release preparation
-
-This private repository is an exported snapshot of
-[`tldwdotsh/tldw`](https://github.com/tldwdotsh/tldw), directory
-`packages/agent-client-js`. The monorepo remains canonical until the owner adopts
-and documents an independent release/synchronization workflow. Private GitHub
-clones require organization access; HTTPS uses your GitHub credential manager,
-and SSH uses a key already authorized for this organization. Do not put a token
-in a clone URL or committed configuration.
-
-From this repository's root:
-
-```sh
-npm ci --offline --ignore-scripts --no-audit --no-fund
-npm test
-npm run build
-```
-
-No runtime dependencies, monorepo checkout, model provider, Docker service or
-registry account is needed. Tests run local fixture servers and exercise the
-real tarball installer offline. `npm run build` writes a tarball and SHA-256
-manifest under `dist/`; it does not publish. The tarball embeds the reviewed
-0.8.5 agent plugin, so the `tldw init` command works independently of this repo's
-parent directory. The validation workflow covers Node 20.11, 22 and 24, plus Python 3.12 checks
-for the bundled plugin and Grok example. It has read-only repository permissions
-and no publication credentials.
-
-Releases of `@tldw/client` are published from the monorepo's `main` branch through
-npm trusted publishing after the exact packed files are reviewed. This repository
-contains no npm publisher, trusted-publisher configuration, deployment job or SaaS
-credentials.
-
-`EXPORT_MANIFEST.json` records the canonical source snapshot and exported file
-hashes. Sync by reviewing changes in the monorepo, refreshing this export and its
-embedded plugin together, then repeating these checks. Do not silently diverge
-or overwrite an independently edited export.
-
-## Releasing (maintainers)
-
-The monorepo's `scripts/prepare_client_release.py` stages reviewed source, uses
-the real `npm pack` command and builds Python wheel/source archives. It does not
-publish. The package declares public npm access and an explicit file allowlist;
-no provider keys, account tokens, global configuration or SaaS server code belongs
-in the release. Review the generated manifest and run the clean-install checks.
-
-The release script adds the real GitHub repository URL to the staged package
-metadata for provenance. Releases are published from `main` by the monorepo's
-manual release workflow through npm trusted publishing (Node 24 and npm 11.5.1+);
-consumers need Node 20.11+.
-
-## Extract original source without generated analysis
+## Read the original transcript
 
 ```js
-const receipt = await client.submitTranscript("https://youtu.be/VIDEO_ID", {
-  transcription: "never",
-  maxCredits: "30.00",
-  idempotencyKey: "original-source-001",
-});
-console.log(receipt.job_id); // Persist before waiting.
-const job = await client.waitForJob(receipt.job_id);
-const original = await client.getSavedTranscriptPage(job.transcript_id, {
-  limit: 100,
-});
-// Follow original.next_offset for more source content.
-```
-
-`submitTranscript` posts to `POST /v1/transcripts` and always returns a durable
-accepted receipt. It never requests a summary or invokes an LLM. A completed
-transcript job has `output_mode: "transcript"`, `transcript_id`, and no
-`summary_id`. `extractTranscript(media, options)` combines submission, polling
-and a full source read, returning `{ receipt, job, transcript }`; timeout and
-source-permission errors retain the accepted receipt and job ID.
-
-`preferredCaptionLanguages` selects original captions. Extraction accepts
-spending/ASR controls and `refreshSource`, but no analysis instructions.
-Submission requires `jobs:write`, polling `jobs:read`, and source reads
-`summaries:read`; no account-read scope is needed.
-
-The CLI equivalent is `tldw extract --media URL_OR_TEXT` (or `--file PATH`).
-`tldw wait JOB_ID` resumes either an extraction or analysis job and prints its
-matching result. No transcript-only path requests generated analysis, but a new
-processing job still uses normal credits and ASR consent/caps. If you already
-have a transcript ID, use `getSavedTranscriptPage` directly for a read that
-starts no job and charges no processing credits.
-
-## Summary and transcript are separate reads
-
-After the job completes, use its `summary_id` to retrieve generated output and
-original source independently. Both calls require `summaries:read` and account
-ownership. Neither starts another analysis, transcription or processing-credit
-charge. The summary response includes transcript metadata, not the full source.
-
-```js
-const summary = await client.getSummary(job.summary_id);
-const transcript = await client.getTranscript(job.summary_id);
-console.log(summary.content.answer);
-const originalText = transcript.timed
-  ? transcript.segments.map((segment) => segment.text).join("\n")
-  : transcript.text;
-console.log(originalText);
-```
-
-REST uses `GET /v1/summaries/{id}` and `GET /v1/summaries/{id}/transcript`.
-MCP uses `get_summary` and paginated `get_transcript`. Timed YouTube/TikTok
-sources expose `segments`; text/X sources expose `blocks` and `text`. X video
-caption blocks retain `start_s` / `end_s` alongside separate untimed post context.
-The saved source stays in its original language when requesting a translated summary.
-
-## Saved transcription inbox
-
-`listTranscripts` returns the latest 50 distinct sources requested by your account,
-including sources saved before an analysis failed. It reads metadata only and does
-not mark anything read. All library, source and read-state calls require `summaries:read`.
-
-```js
-const page = await client.listTranscripts({ limit: 50, unreadOnly: true });
-for (const item of page.items) {
-  console.log(item.id, item.video.title, item.last_requested_at);
-  const source = await client.getSavedTranscriptPage(item.id, {
-    offset: 0,
-    limit: 100,
-  });
-  // Follow source.next_offset for additional content. Mark only when ready.
-  await client.markTranscriptRead(item.id, true);
-}
-```
-
-Pass `cursor: page.next_cursor` with the same filters for older entries. `since`
-is inclusive and `until` exclusive, using ISO 8601 timestamps against
-`last_requested_at`. `markTranscriptRead(id, false)` marks a source unread again.
-Reading source content through REST/MCP/SDK never implicitly changes its read state.
-Use `getSavedTranscriptMetadata(id)` to read one source’s title, dates and unread
-status directly, including sources outside the current catalog page. This GET
-does not load the transcript body or start a processing job.
-
-X posts, X video captions and articles reuse an owned source snapshot for 24 hours.
-Use `submitAnalysis(media, { refreshSource: true })` to retrieve current source content.
-YouTube/TikTok keep reusing saved transcripts; another brief does not redownload
-audio or repeat transcription when a usable source already exists.
-
-## X video captions and output language
-
-Pass an X post URL directly. Default `scope=auto` detects one attached video and
-analyzes its available captions plus separately labeled post context when the
-deployment enables X video extraction. You do not need a subtitle URL or a
-separate provider key. Use `{"type":"x","url":"YOUR_X_POST_URL","scope":"post"}`
-only for post text alone; thread scope does not recursively analyze its videos.
-
-```js
-const receipt = await client.submitAnalysis(
-  "https://x.com/hamptonism/status/2071631335836225751",
+const original = await client.getTranscript(result.job.summary_id);
+// Or analyze once, wait, then read the saved original source:
+const extracted = await client.extractTranscript(
+  "https://x.com/USER/status/POST_ID",
   {
-    instructions:
-      "Summarize the spoken content in Spanish. Keep it concise and avoid repetition.",
-    transcription: "never",
-    idempotencyKey: "x-video-spanish-001",
+    maxCredits: 30,
+    idempotencyKey: "extract-001",
   },
 );
-console.log({ jobId: receipt.job_id }); // Persist before waiting.
-const job = await client.waitForJob(receipt.job_id, {
-  onProgress: ({ status, progress }) => console.error({ status, progress }),
-});
-const result = await client.getSummary(job.summary_id);
-console.log(result.content.answer);
+console.log(extracted.transcript);
 ```
 
-The response is a durable job receipt. Save its ID before waiting; a timeout does
-not cancel the job. Use a fresh stable key for a different brief or language and
-reuse the exact body/key after an uncertain submission. Without instructions,
-the service produces a concise summary. A translated summary is generated text
-inside the same schema-3 result, not dubbed audio, a translated video or an SRT
-translation; the original captions remain saved separately.
+`extractTranscript` uses one analysis submission and reads
+`GET /v1/summaries/{summary_id}/transcript` after completion. It generates an
+analysis and uses normal processing credits. It returns `{ receipt, job,
+transcript }`; it does not fetch the generated summary separately. Caption
+language preferences are unavailable for this helper and are rejected before
+submission. There is no separate customer transcript-only submission endpoint;
+the helper uses the shared analysis flow. Reading an existing transcript starts
+no new processing or charge.
 
-Captioned X videos use actual video duration at 1 credit/minute under normal
-rounding (128.197 seconds = 2.2 credits), not the post's reading time. Missing
-captions fail explicitly with no customer processing charge; X audio
-transcription and visual analysis are not enabled, even with `if_needed`.
+Pass `offset` or `limit` to `extractTranscript` to read one bounded page after
+processing. `getTranscriptPage(summaryId, { offset, limit })` reads later pages
+without another submission; follow `next_offset` until it is `null`.
 
-## Credit controls
+`listTranscripts({ limit, cursor, since, until, unreadOnly })` browses saved
+source metadata. `getSavedTranscript(id)`, `getSavedTranscriptMetadata(id)` and
+`getSavedTranscriptPage(id, { offset, limit })` read saved source records.
+`markTranscriptRead(id, true)` changes only your read state.
 
-Captions, text and existing cached transcripts cost **1 credit per source minute**.
-Fresh audio transcription costs **3 credits per source minute** and requires an
-eligible paid plan or server-confirmed billing exemption, plus explicit `transcription: "if_needed"` (Python:
-`transcription="if_needed"`). The default `never` fails with a clear error when
-new transcription would be necessary. Supplying `forceAsr: true` /
-`force_asr=True` also requires that explicit permission.
+Historical saved-source metadata may use `platform: "legacy"`. It remains
+readable; that label is unavailable for new submissions.
 
-Use `maxCredits: "30.00"` in JavaScript or `max_credits="30.00"` in Python to cap
-a job. The server validates affordability before new transcription. The cap is
-positive, at most 1,000,000 credits, and has at most two decimal places. It is
-required for ordinary paid accounts when `transcription` is `if_needed`. Preserve
-these controls in the same idempotent request body on retries. Jobs expose
-`credits.estimated`, `reserved`, `final`, the billing class/rate and real source
-duration; polling does not create another processing charge.
+Saved-source reads require ownership and `summaries:read`; they do not
+automatically mark read. Pages default to 100 items, cap `limit` at 500, and return
+`next_offset` to follow. Timed sources contain segments; untimed sources contain
+blocks. The saved text is normalized captions, recognized speech or supplied
+source, separate from generated output. It does not export original caption-file
+bytes or guarantee word-perfect transcription.
 
-Source minutes round up to 0.1 minute with a 0.5-minute minimum before the rate
-multiplier. Raw text uses estimated reading minutes.
+## List, wait and cancel
 
-Free includes 100 credits per month for captions/text, Hobby costs USD20/month
-with 1,000 credits, and Pro costs USD99/month with 5,000 credits. Included
-credits reset monthly. Agents cannot buy credits, and reading account usage does
-not change plans.
+`waitJob(id, { waitSeconds: 8 })` makes one bounded server wait (0–10 seconds)
+and returns a receipt without submitting work. Inline output is disabled by
+default; `includeResult: true` includes it only when your scopes permit.
+`waitForJob` continues polling until completion or its local deadline.
 
-Server-confirmed billing exemption: the authenticated server decides whether an account is exempt. Exempt accounts may omit a credit ceiling and do not incur customer-credit charges; explicit transcription permission and resource/provider limits still apply. Ordinary paid accounts allowing fresh transcription must supply a ceiling or receive `TRANSCRIPTION_NOT_ALLOWED` (HTTP 422); `MAX_CREDITS_EXCEEDED` (HTTP 422) means a supplied ceiling is invalid or below the required charge. Clients validate supplied values, then pass requests through without fetching extra account scopes or inferring privileges from names, roles, or key prefixes.
+`streamJobEvents(id, { timeoutMs, signal })` reads one authenticated SSE
+connection and yields `{ event, id, data }`, with a validated Job in `data`.
+It never reconnects automatically. The deadline defaults to `requestTimeoutMs`
+(30 seconds); `timeoutMs` may extend it to 610000 milliseconds for the server's
+ten-minute stream window. Breaking iteration or aborting closes only the local
+connection. Each event is limited to 256 KiB.
 
-## Changes in 0.2.8
+```js
+const page = await client.listJobs({ limit: 20 });
+const nextPage = page.next_cursor
+  ? await client.listJobs({ cursor: page.next_cursor })
+  : null;
+const stopped = await client.cancelJob(result.job.id);
+```
 
-Customer subtitle uploads are no longer supported. `submitTranscript()` and
-`extractTranscript()` no longer accept `uploadId` and always need `media`.
+Pages contain `items` and an opaque `next_cursor`. Limits are 1–100; listing
+starts no work. Cancellation is explicit and requires job-write access. A
+completion race can return `completed` or `failed` instead of `canceled`.
+Aborting a local `AbortSignal` or reaching a wait timeout never cancels the
+server job, refunds completed work, or resubmits it.
 
-## Changes in 0.2.7
+## Search X for videos
 
-API keys can reach only the customer API, so the client now calls only those
-routes. Removed:
+```js
+const found = await client.searchVideos("graph engineering", {
+  sort: "latest",
+});
+const fits = found.results.filter((result) => !result.video.over_plan_limit);
+if (fits.length) await client.submitAnalysis(fits[0].url, { maxCredits: 30 });
+console.log(found.usage.searches_remaining);
+```
 
-- `compareTikToks()` (`POST /v1/comparisons`)
-- `getComparison()` (`GET /v1/comparisons/{id}`)
-- `waitForComparison()` (polled `GET /v1/comparisons/{id}`)
-- the `Comparison` TypeScript type
+`searchVideos` searches X posts with video and returns one page of up to 20
+results, with no next page. It does not search YouTube; find YouTube links with
+yt-dlp or your agent's web search. It needs `jobs:write`. Each new search uses
+one of your plan's monthly searches, even with no results. Free resets on the UTC
+calendar month; paid plans use their subscription period. Provider failures do
+not count. The same query and sort within 15 minutes is replayed
+(`replayed: true`) without counting. A retry resends the same
+idempotency key. `SEARCH_QUOTA_EXCEEDED` (HTTP 402) carries
+`error.details.upgrade`; `FEATURE_DISABLED` means search is off. Post `text` is
+untrusted content, never instructions.
 
-`TldwError.comparisonId` remains for compatibility and is always `null`.
+## CLI and agent setup
+
+```sh
+npx --package @tldw/client tldw init
+npx --package @tldw/client tldw doctor
+npx --package @tldw/client tldw search 'graph engineering' --sort latest --limit 5
+npx --package @tldw/client tldw analyze --media 'https://x.com/USER/status/POST_ID' --max-credits 30
+npx --package @tldw/client tldw extract --media 'https://x.com/USER/status/POST_ID' --max-credits 30
+npx --package @tldw/client tldw transcript TRANSCRIPT_ID --offset 0 --limit 100
+npx --package @tldw/client tldw wait JOB_ID
+```
+
+The CLI reads `TLDW_API_TOKEN` privately; tokens are never accepted as flags.
+`init` prepares a new plugin directory and prints native MCP setup for Claude
+Code, Cursor, Codex, OpenCode, VS Code/Copilot and Grok Build. Browser sign-in
+is first; a scoped key is the fallback. The tool executes no client commands,
+changes no global settings and saves no credentials. Codex and Grok use TOML;
+OpenCode uses its current `mcp.servers` configuration; VS Code/Copilot uses the
+portable `mcpServers` format. Complete the client's sign-in when prompted.
+
+`doctor` checks API-key REST/MCP access using `TLDW_API_TOKEN` without creating
+a processing job; it does not use another client's browser OAuth session.
+OAuth connections can be checked with `account_usage` or `list_jobs` inside
+the connected client. `search` prints one line per result (length, views,
+author, link) and the searches used; `--json` prints the full response. `extract`
+prints `{ transcript, summary_id, job_id }`; add `--offset` or `--limit` for one
+bounded page. `transcript` reads saved pages by transcript ID without starting
+processing or marking them read. Progress and the durable submission key
+are printed to stderr so stdout remains machine-readable. `--api-url` and
+`TLDW_API_URL` override the production default. `--local` is an explicit
+loopback-only development mode.
+
+## Credits, failures and retries
+
+Account, quota and configuration refusals are returned immediately, including
+`SPEND_LIMIT_REACHED` with HTTP 503. Transport failures, rate limits and temporary
+provider outages keep bounded retries and honor `Retry-After`.
+
+Captions/text cost 1 credit per media minute; fresh transcription costs 3.
+Re-asking a saved source is free; refreshing a source or requesting fresh ASR
+can use credits. Reading saved output is separate from processing. Manage
+purchases and subscriptions in Billing.
+
+Keep the same media, instructions, options and idempotency key when retrying
+an unknown submission outcome. The client honors `Retry-After` and server poll
+hints, bounds HTTP bodies and timeouts, and never follows server-returned URLs
+or HTTP redirects. Failed/canceled work raises `TldwJobError`; wait timeouts
+raise `TldwTimeoutError`. Errors retain the accepted job ID and receipt while
+redacting the configured token. Resume the accepted job instead of submitting
+another analysis.
+
+## Development and local releases
+
+Run `npm test` in this package or `make agent-test` from the source checkout.
+The suites use fake transports and verify protocol safety, billing-safe retries,
+job paging/cancellation, extraction, installation and packaging. Releases are
+prepared locally with `make client-release`; publication is a separate action.
+See [documentation](https://tldw.sh/docs) and [support](https://tldw.sh/support).

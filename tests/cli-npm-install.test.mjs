@@ -91,7 +91,9 @@ test(
       await readFile(join(root, "installed", "codex.mcp.json"), "utf8"),
     );
     assert.equal(config.mcpServers.tldw.url, "https://api.operator.test/mcp");
-    assert.equal(config.mcpServers.tldw.bearer_token_env_var, "TLDW_API_TOKEN");
+    assert.deepEqual(config.mcpServers.tldw, {
+      url: "https://api.operator.test/mcp",
+    });
     assert.equal(
       await readFile(join(root, "installed", ".gitignore"), "utf8"),
       await readFile(join(source, "plugin", ".gitignore"), "utf8"),

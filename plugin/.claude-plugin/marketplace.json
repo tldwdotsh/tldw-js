@@ -2,13 +2,14 @@
   "name": "tldw",
   "description": "Agent workflows for the tldw.sh media analysis SaaS.",
   "owner": {
-    "name": "tldw.sh contributors"
+    "name": "tldw.sh",
+    "email": "support@tldw.sh"
   },
   "plugins": [
     {
       "name": "tldw",
       "source": "./",
-      "description": "Custom analysis of text, X, articles and video through the tldw.sh SaaS and MCP server."
+      "description": "Custom analysis of text, X posts and Articles, and video through the tldw.sh SaaS and MCP server."
     }
   ]
 }

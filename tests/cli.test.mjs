@@ -115,15 +115,12 @@ test("init materializes the reviewed plugin with endpoint-only native configs an
   // The endpoint is literal: no environment variable may redirect the token.
   assert.equal(claude.mcpServers.tldw.url, API + "/mcp");
   assert.ok(!JSON.stringify(claude).includes("TLDW_MCP_URL"));
-  assert.equal(
-    claude.mcpServers.tldw.headers.Authorization,
-    "Bearer ${TLDW_API_TOKEN}",
-  );
+  assert.deepEqual(claude.mcpServers.tldw, { type: "http", url: API + "/mcp" });
   const codex = JSON.parse(
     await readFile(join(target, "codex.mcp.json"), "utf8"),
   );
   assert.equal(codex.mcpServers.tldw.url, API + "/mcp");
-  assert.equal(codex.mcpServers.tldw.bearer_token_env_var, "TLDW_API_TOKEN");
+  assert.deepEqual(codex.mcpServers.tldw, { url: API + "/mcp" });
   const build = JSON.parse(await readFile(join(target, "BUILD.json"), "utf8"));
   for (const [name, checksum] of Object.entries(build.sha256))
     assert.equal(
@@ -132,7 +129,52 @@ test("init materializes the reviewed plugin with endpoint-only native configs an
         .digest("hex"),
       checksum,
     );
-  assert.match(result.commands.codex[0], /marketplace add/);
+  assert.deepEqual(Object.keys(result.commands).sort(), [
+    "claude_code",
+    "codex",
+    "cursor",
+    "grok",
+    "opencode",
+    "vscode",
+  ]);
+  assert.match(result.commands.codex.commands[0], /codex mcp add tldw --url/);
+  assert.equal(result.commands.cursor.config.mcpServers.tldw.url, API + "/mcp");
+  assert.equal(
+    result.commands.opencode.config.mcp.servers.tldw.url,
+    API + "/mcp",
+  );
+  assert.equal(result.commands.vscode.config.mcpServers.tldw.url, API + "/mcp");
+  for (const client of ["codex", "grok"]) {
+    assert.match(result.commands[client].config_toml, /\[mcp_servers\.tldw\]/);
+    assert.ok(result.commands[client].config_toml.includes(API + "/mcp"));
+  }
+  // Guidance and packaged examples are one reviewed connection contract.
+  for (const [client, file] of [
+    ["cursor", "cursor/mcp.json"],
+    ["opencode", "opencode/opencode.json"],
+    ["vscode", "vscode/mcp-config.json"],
+  ]) {
+    const expected = JSON.parse(
+      (await readFile(join(SOURCE, "examples", file), "utf8")).replaceAll(
+        "https://api.tldw.invalid",
+        API,
+      ),
+    );
+    assert.deepEqual(result.commands[client].config, expected);
+  }
+  for (const [client, file] of [
+    ["codex", "codex/config.toml"],
+    ["grok", "grok/grok-config.example.toml"],
+  ]) {
+    const expected = (await readFile(join(SOURCE, "examples", file), "utf8"))
+      .replaceAll("https://api.tldw.invalid", API)
+      .split("\n")
+      .filter((line) => line && !line.startsWith("#"))
+      .join("\n");
+    assert.equal(result.commands[client].config_toml.trim(), expected);
+  }
+  assert.equal("generic_mcp" in result.commands, false);
+  assert.equal("oauth" in result.commands.grok, false);
   assert(!JSON.stringify(result).includes("--trust"));
 });
 
@@ -155,6 +197,23 @@ test("init never replaces an existing directory, file or symlink", async (t) => 
       code: "DESTINATION_EXISTS",
     },
   );
+});
+
+test("CLI init defaults to production API/web origins without exposing environment credentials", async (t) => {
+  const parent = await temporary(t);
+  const out = outputs();
+  const code = await runCli(["init", "--dir", join(parent, "plugin")], {
+    ...out,
+    env: { TLDW_API_TOKEN: "private-environment-sentinel" },
+  });
+  assert.equal(code, 0, out.lines.err);
+  const result = JSON.parse(out.lines.out);
+  assert.equal(result.api_url, "https://api.tldw.sh");
+  assert.equal(result.mcp_url, "https://api.tldw.sh/mcp");
+  assert.equal(result.onboarding_url, "https://tldw.sh/agents");
+  assert.equal(Object.keys(result.commands).length, 6);
+  assert.equal(result.credentials_saved, false);
+  assert.ok(!out.lines.out.includes("private-environment-sentinel"));
 });
 
 test("npm's reviewed .gitignore rename is restored, but changed or additional aliases are refused", async (t) => {

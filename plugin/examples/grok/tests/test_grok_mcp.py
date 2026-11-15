@@ -37,23 +37,8 @@ def completed(text="A timestamped account-grounded answer."):
 
 
 class ExampleTests(unittest.TestCase):
-    def test_rebrand_accepts_legacy_environment_without_changing_key_value(self):
+    def test_current_environment_names_supply_private_credentials(self):
         env = configured_env()
-        token = "yta_fixture-legacy-private-token"
-        env["YT2ALPHA_API_TOKEN"] = token
-        env["YT2ALPHA_MCP_URL"] = env.pop("TLDW_MCP_URL")
-        env.pop("TLDW_API_TOKEN")
-        config = grok.config_from_env(env)
-        self.assertEqual(config.personal_token, token)
-        self.assertEqual(config.mcp_url, "https://api.owner.net/mcp")
-        self.assertEqual(
-            grok.payload(config, "Read a summary.")["tools"][0]["server_label"], "tldw"
-        )
-
-    def test_new_environment_names_override_legacy_and_do_not_fall_back_when_invalid(self):
-        env = configured_env()
-        env["YT2ALPHA_API_TOKEN"] = "yta_legacy-private-token"
-        env["YT2ALPHA_MCP_URL"] = "https://old.owner.net/mcp"
         config = grok.config_from_env(env)
         self.assertEqual(config.personal_token, env["TLDW_API_TOKEN"])
         self.assertEqual(config.mcp_url, env["TLDW_MCP_URL"])
