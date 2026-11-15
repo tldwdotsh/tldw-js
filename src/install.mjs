@@ -569,7 +569,7 @@ export async function installPlugin({
       "The prepared plugin directory contains optional instructions. No client command has been executed, and no global settings or credentials have been saved.",
       "For an API-key fallback, create a scoped key at https://tldw.sh/developers with account:read, jobs:write, jobs:read and summaries:read so the canonical account_usage check works. Keep TLDW_API_TOKEN in your private environment or the client's supported secret store.",
       "After browser sign-in, verify access with account_usage or list_jobs inside the connected client. For an API-key check, run tldw doctor with TLDW_API_TOKEN; the CLI does not use another client's OAuth session. These checks submit no analysis.",
-      "Omit transcription to let the server choose its current policy; max_credits caps one job. Captions/text cost 1 credit/minute and fresh audio transcription costs 3. Re-asking a saved source is free; a source refresh can use credits.",
+      "Processing uses captions/text or saved source only at 1 credit/minute; fresh audio transcription is unavailable. Legacy transcription and force_asr fields are accepted but ignored. max_credits caps one job. Re-asking a saved source is free; a source refresh can use credits.",
     ],
     commands: {
       claude_code: {

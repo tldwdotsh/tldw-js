@@ -441,7 +441,102 @@ test("oversized and non-JSON API output fails safely", async () => {
   );
 });
 
-test("spending permission and decimal ceiling reach REST without implicit ASR consent", async () => {
+test("default and auto analysis never add fresh-ASR permission, including when a cap is supplied", async () => {
+  const bodies = [];
+  const media = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+  const client = make(async (_url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return response(receipt(), 202);
+  });
+  await client.submitAnalysis(media);
+  await client.submitAnalysis(media, { transcription: "auto" });
+  await client.submitAnalysis(media, { maxCredits: "30.00" });
+  await client.submitAnalysis(media, { transcription: "never" });
+  assert.deepEqual(bodies, [
+    { media },
+    { media, transcription: "auto" },
+    { media, max_credits: "30.00" },
+    { media, transcription: "never" },
+  ]);
+});
+
+test("missing captions remain structured and nonretryable rather than authorizing fresh ASR", async () => {
+  const details = { platform: "youtube", reason: "captions_unavailable" };
+  for (const status of [422, 503]) {
+    const bodies = [];
+    const client = make(async (_url, init) => {
+      bodies.push(JSON.parse(init.body));
+      return response(
+        {
+          error: {
+            code: "CAPTIONS_UNAVAILABLE",
+            message: "No accessible captions were found.",
+            details,
+          },
+        },
+        status,
+      );
+    });
+    await assert.rejects(
+      client.submitAnalysis("https://www.youtube.com/watch?v=dQw4w9WgXcQ", {
+        maxCredits: "30.00",
+      }),
+      (error) => {
+        assert(error instanceof TldwError);
+        assert.equal(error.code, "CAPTIONS_UNAVAILABLE");
+        assert.equal(error.status, status);
+        assert.deepEqual(error.details, details);
+        return true;
+      },
+    );
+    assert.equal(bodies.length, 1);
+    assert.equal(bodies[0].transcription, undefined);
+    assert.equal(bodies[0].force_asr, undefined);
+  }
+});
+
+test("accepted caption-only jobs fail once with their source error and never create an ASR replacement", async () => {
+  for (const operation of ["analyze", "extractTranscript"]) {
+    const calls = [];
+    const client = make(async (url, init) => {
+      calls.push({ url, init });
+      if (init.method === "POST") return response(receipt(), 202);
+      return response(
+        job("failed", {
+          error: {
+            code: "CAPTIONS_UNAVAILABLE",
+            message: "No accessible captions were found.",
+            details: { platform: "youtube", reason: "captions_unavailable" },
+          },
+        }),
+      );
+    });
+    await assert.rejects(
+      client[operation]("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+      (error) => {
+        assert(error instanceof TldwJobError);
+        assert.equal(error.code, "CAPTIONS_UNAVAILABLE");
+        assert.equal(error.jobId, jobId);
+        assert.equal(error.receipt.job_id, jobId);
+        assert.equal(
+          error.resource.error.details.reason,
+          "captions_unavailable",
+        );
+        return true;
+      },
+    );
+    assert.deepEqual(
+      calls.map(({ init }) => init.method),
+      ["POST", "GET"],
+    );
+    assert.deepEqual(JSON.parse(calls[0].init.body), {
+      media: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    });
+    assert.equal(calls[1].url, `https://api.example.test/v1/jobs/${jobId}`);
+  }
+});
+
+test("deprecated audio fields remain compatible while decimal ceilings are enforced", async () => {
   const bodies = [];
   const client = make(async (_url, init) => {
     bodies.push(JSON.parse(init.body));
@@ -463,24 +558,31 @@ test("spending permission and decimal ceiling reach REST without implicit ASR co
       client.submitAnalysis("source", { maxCredits }),
       TypeError,
     );
-  await assert.rejects(
-    client.submitAnalysis("source", { forceAsr: true }),
-    TypeError,
-  );
+  await client.submitAnalysis("source", { forceAsr: true });
+  assert.deepEqual(bodies[1], { media: "source", force_asr: true });
+  await client.submitAnalysis("source", {
+    transcription: "never",
+    forceAsr: true,
+  });
+  assert.deepEqual(bodies[2], {
+    media: "source",
+    transcription: "never",
+    force_asr: true,
+  });
   await client.submitAnalysis("source", { transcription: "auto" });
-  assert.deepEqual(bodies[1], { media: "source", transcription: "auto" });
+  assert.deepEqual(bodies[3], { media: "source", transcription: "auto" });
   await assert.rejects(
     client.submitAnalysis("source", { transcription: "sometimes" }),
     TypeError,
   );
   assert.equal(
     bodies.length,
-    2,
+    4,
     "invalid limits must not submit processing work",
   );
 });
 
-test("omitted transcription caps reach the authenticated server without an account lookup", async () => {
+test("deprecated if_needed forwards without an account lookup or artificial cap requirement", async () => {
   const calls = [];
   const client = make(async (url, init) => {
     calls.push({ url, body: JSON.parse(init.body) });
@@ -494,24 +596,23 @@ test("omitted transcription caps reach the authenticated server without an accou
     transcription: "if_needed",
   });
 });
-test("ordinary account missing-cap policy errors remain actionable and are not retried", async () => {
+test("normal credit-ceiling errors remain actionable and are not retried", async () => {
   let calls = 0;
   const client = make(async () => {
     calls++;
     return response(
       {
         error: {
-          code: "TRANSCRIPTION_NOT_ALLOWED",
-          message: "A credit ceiling is required.",
+          code: "MAX_CREDITS_EXCEEDED",
+          message: "The source exceeds the credit ceiling.",
         },
       },
       422,
     );
   });
   await assert.rejects(
-    client.submitAnalysis("source", { transcription: "if_needed" }),
-    (error) =>
-      error.code === "TRANSCRIPTION_NOT_ALLOWED" && error.status === 422,
+    client.submitAnalysis("source", { maxCredits: "1.00" }),
+    (error) => error.code === "MAX_CREDITS_EXCEEDED" && error.status === 422,
   );
   assert.equal(calls, 1);
 });

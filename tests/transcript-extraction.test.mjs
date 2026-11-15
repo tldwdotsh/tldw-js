@@ -70,7 +70,7 @@ test("analyzes once then reads original source without following returned URLs",
   assert.equal(calls[0].headers["Idempotency-Key"], "extract-once");
 });
 
-test("extraction passes explicit spending controls through one analysis submission", async () => {
+test("extraction forwards deprecated audio fields and caps through one analysis submission", async () => {
   const calls = [];
   const sdk = client(async (url, init) => {
     if (init.method === "POST") {
@@ -81,7 +81,7 @@ test("extraction passes explicit spending controls through one analysis submissi
     return response(url.includes("/jobs/") ? completed : source);
   });
   await sdk.extractTranscript("https://x.com/user/status/1234567890", {
-    transcription: "if_needed",
+    transcription: "never",
     maxCredits: "9.00",
     forceAsr: true,
     refreshSource: true,
@@ -89,7 +89,7 @@ test("extraction passes explicit spending controls through one analysis submissi
   assert.deepEqual(calls, [
     {
       media: "https://x.com/user/status/1234567890",
-      transcription: "if_needed",
+      transcription: "never",
       max_credits: "9.00",
       force_asr: true,
       refresh_source: true,
@@ -109,7 +109,7 @@ test("rejects removed caption preferences and invalid extraction inputs before s
     [null, {}],
     ["source", { preferredCaptionLanguages: ["invalid tag"] }],
     ["source", { refreshSource: "true" }],
-    ["source", { forceAsr: true }],
+    ["source", { forceAsr: "true" }],
   ])
     await assert.rejects(sdk.extractTranscript(media, options), TypeError);
   assert.equal(requests, 0);

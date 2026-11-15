@@ -34,9 +34,11 @@ or a command argument. Agent workflows recommend `account:read`, `jobs:write`, `
 
 First call `account_usage` to check access. Only a user request authorizes a new
 analysis; save its job ID, resume that ID after a disconnect, and retrieve the
-summary and original transcript after completion. The server chooses whether
-eligible audio fallback is needed. Follow the canonical tldw skill for source,
-spending, error and untrusted-content rules.
+summary and all original-transcript pages after completion. The service uses
+usable saved source or captions; fresh audio transcription is unavailable on
+every plan. Missing captions fail without a processing-credit charge; stop or
+provide authorized source text instead of resubmitting automatically. Follow
+the canonical skill for source, spending, error and untrusted-content rules.
 
 Official references: [MCP servers](https://docs.x.ai/build/features/mcp-servers),
 [skills and plugins](https://docs.x.ai/build/features/skills-plugins-marketplaces).

@@ -8,8 +8,8 @@ A dependency-free client for the asynchronous tldw.sh API. Requires Node.js 20.1
 npm install @tldw/client
 ```
 
-This documentation describes **0.2.12**: saved transcript extraction, X video
-search, job listing/cancellation and server-selected audio fallback. Reviewed,
+This documentation describes **0.2.13**: saved transcript extraction, X video
+search, job listing/cancellation and captions-only processing. Reviewed,
 checksum-pinned downloads and current registry availability are listed on
 [Connect your agent](https://tldw.sh/agents).
 Only npm `@tldw/client` is this client.
@@ -46,12 +46,15 @@ const result = await client.analyze("https://x.com/USER/status/POST_ID", {
 console.log(result.job.id, result.summary.content);
 ```
 
-Omit `transcription` to let the server decide its account/source policy.
-`"auto"` explicitly selects that policy; `"never"` prevents fresh audio
-transcription, and `"if_needed"` permits it when the account and platform allow
-it. `forceAsr: true` requires explicit `transcription: "if_needed"`.
-`maxCredits` is a positive decimal ceiling with at most two decimal places.
-The server enforces access, funding and duration limits.
+Processing uses accessible captions or saved source, including previously settled
+audio transcripts. Fresh audio transcription is unavailable. `transcription`
+(`"auto"`, `"never"`, `"if_needed"`) and `forceAsr` are deprecated compatibility
+fields: accepted but ignored, without bypassing captions or saved-source reuse.
+`CAPTIONS_UNAVAILABLE` is a nonretryable failure when neither is available; the
+failed job releases its hold without a processing-credit charge. A blocked or
+transient retrieval failure retains its own error. `maxCredits` still sets a positive
+decimal credit ceiling with at most two decimal places. The server enforces
+funding and duration limits.
 
 For durable control, call `submitAnalysis(media, options)`, keep its `job_id`,
 then use `waitForJob(jobId)` and `getSummary(job.summary_id)`. X media can be
@@ -190,8 +193,11 @@ Account, quota and configuration refusals are returned immediately, including
 `SPEND_LIMIT_REACHED` with HTTP 503. Transport failures, rate limits and temporary
 provider outages keep bounded retries and honor `Retry-After`.
 
-Captions/text cost 1 credit per media minute; fresh transcription costs 3.
-Re-asking a saved source is free; refreshing a source or requesting fresh ASR
+Captions/text and saved source cost 1 credit per media minute. Fresh audio
+transcription is unavailable.
+A new analysis is free only when the account-scoped re-ask policy covers the
+instructions and this account has a usable source from a completed job.
+`rates.reask=0` alone may cover only identical instructions. Refreshing a source
 can use credits. Reading saved output is separate from processing. Manage
 purchases and subscriptions in Billing.
 

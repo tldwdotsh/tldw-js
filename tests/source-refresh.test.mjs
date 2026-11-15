@@ -13,7 +13,10 @@ function client(calls) {
       let value;
       if (init.method === "POST") {
         calls.push(JSON.parse(init.body));
-        value = { job_id: jobId, job: { id: jobId, status: "queued", progress: 0 } };
+        value = {
+          job_id: jobId,
+          job: { id: jobId, status: "queued", progress: 0 },
+        };
       } else if (url.includes("/v1/jobs/")) {
         value = {
           id: jobId,

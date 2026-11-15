@@ -1,6 +1,6 @@
 {
   "name": "tldw",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Analyze YouTube links, public X posts and Articles, and text with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
   "author": {
     "name": "tldw.sh",

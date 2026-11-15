@@ -48,8 +48,8 @@ export interface JobCredits {
   /** Credits per billable source minute for this job's billing class. */
   rate_multiplier: number | string;
   /**
-   * `standard`: captions, text or a saved transcript. `fresh_asr`: fresh
-   * audio transcription. `reask`: a source this account already processed.
+   * `standard`: captions, text or a saved transcript. `fresh_asr`: historical
+   * audio transcription jobs. `reask`: a source this account already processed.
    */
   billing_class: "standard" | "fresh_asr" | "reask";
   /** Identifier of the pricing rules that priced the job. */
@@ -294,7 +294,7 @@ export interface VideoSearchResult {
     duration_seconds: number | null;
     /** True when the video is longer than your plan allows. */
     over_plan_limit: boolean;
-    /** Caption-rate estimate; audio transcription costs three times as much. */
+    /** Caption-rate estimate; actual job credits are authoritative. */
     estimated_credits: number | null;
   };
 }
@@ -332,11 +332,14 @@ export interface SubmitOptions {
   idempotencyKey?: string;
   /** Aborts the HTTP request (and, for analyze(), the wait). */
   signal?: AbortSignal;
-  /** Omit to let the server decide; auto explicitly selects the same policy. */
+  /**
+   * @deprecated Compatibility field, accepted but ignored. Processing uses
+   * captions or saved source only; fresh audio transcription is unavailable.
+   */
   transcription?: "auto" | "never" | "if_needed";
   /** Decimal credit ceiling for one job. */
   maxCredits?: number | string;
-  /** Requires explicit transcription=if_needed and server-authorized ASR access. */
+  /** @deprecated Compatibility field, accepted but ignored. */
   forceAsr?: boolean;
 }
 /** Options for submitAnalysis(), analyze() and extractTranscript(). */

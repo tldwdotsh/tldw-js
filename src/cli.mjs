@@ -35,7 +35,7 @@ import {
 } from "./install.mjs";
 
 // Printed for no arguments, `help`, `--help` or `-h` (first argument only).
-// The plan and credit figures are static copy: update them with pricing.
+// Current plan allowances come from account usage and the public catalog.
 const HELP = `tldw — connect agents to the tldw.sh API
 
 init [--api-url ORIGIN] [--web-url ORIGIN] [--dir ./tldw-agent-plugin]
@@ -68,15 +68,15 @@ wait JOB_ID [--api-url ORIGIN] [--timeout-ms 180000] [--local]
   Resume a durable job. A wait timeout or Ctrl-C does not cancel server work.
 
 The API defaults to https://api.tldw.sh; TLDW_API_URL or --api-url overrides it.
-Set TLDW_API_TOKEN privately. --transcription may be omitted: the server decides (auto).
+Set TLDW_API_TOKEN privately. Processing uses captions or saved source only.
 Tokens are never accepted as command arguments or saved by this tool.
 --local explicitly permits anonymous HTTP/HTTPS loopback development only.
-Launch offers: Free includes 100 monthly caption/text credits; Hobby USD20/1000.
+Read account usage and the public catalog for current plan allowances and offers.
 Existing Pro subscriptions retain their account limits; Pro has no new checkout.
-Captions/text or cached transcripts cost 1 credit/minute; fresh ASR costs 3.
-Audio transcription depends on account and platform access. --force-asr requires explicit --transcription if_needed. --max-credits caps a job; the server enforces the current credit policy.
+Captions/text or cached transcripts cost 1 credit/minute; fresh audio transcription is unavailable.
+--transcription and --force-asr are deprecated compatibility flags, accepted but ignored by the server. --max-credits still caps normal processing credits.
 Included credits reset monthly. Manage purchases and subscriptions in Billing.
-Re-asking a saved source is free; refreshing or transcribing a source can use credits.
+Re-asking a saved source is free; refreshing a source can use credits.
 X post and X Article sources may reuse a saved snapshot for 24 hours; --refresh-source fetches current content without forcing ASR.
 `;
 
@@ -423,7 +423,7 @@ export async function checkMcp({ apiUrl, token, fetchImpl = fetch, signal }) {
   const initialized = await rpc(1, "initialize", {
     protocolVersion: protocol,
     capabilities: {},
-    clientInfo: { name: "tldw-cli", version: "0.2.12" },
+    clientInfo: { name: "tldw-cli", version: "0.2.13" },
   });
   if (
     typeof initialized.protocolVersion !== "string" ||

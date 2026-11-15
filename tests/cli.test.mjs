@@ -570,7 +570,6 @@ test("CLI reports invalid options without announcing an unsent submission", asyn
   for (const args of [
     ["--transcription", "sometimes"],
     ["--max-credits", "abc", "--transcription", "if_needed"],
-    ["--force-asr"],
   ]) {
     const out = outputs();
     let fetched = 0;
@@ -643,7 +642,62 @@ test("CLI never echoes an API token hidden in an explicit key or progress respon
   assert.match(out.lines.err, /REDACTED/);
 });
 
-test("CLI forwards explicit ASR consent and ceiling without losing them during submission", async () => {
+test("CLI help explains full captions-only processing and ignored legacy flags", async () => {
+  const io = outputs();
+  const status = await runCli(["--help"], {
+    ...io,
+    env: {},
+    clientFactory() {
+      throw new Error("Help must not create a client");
+    },
+  });
+  assert.equal(status, 0);
+  assert.match(io.lines.out, /Processing uses captions or saved source only/);
+  assert.match(io.lines.out, /fresh audio transcription is unavailable/);
+  assert.match(
+    io.lines.out,
+    /--transcription and --force-asr are deprecated compatibility flags, accepted but ignored/,
+  );
+  assert.match(
+    io.lines.out,
+    /--max-credits still caps normal processing credits/,
+  );
+});
+
+test("CLI default analysis forwards the cap without opting in to fresh ASR", async () => {
+  const io = outputs();
+  let received;
+  class Client {
+    async submitAnalysis(_media, options) {
+      received = options;
+      return { job_id: "00000000-0000-4000-8000-000000000101" };
+    }
+    async waitForJob() {
+      return { summary_id: "00000000-0000-4000-8000-000000000102" };
+    }
+    async getSummary() {
+      return { content: { answer: "done" } };
+    }
+  }
+  const status = await runCli(
+    [
+      "analyze",
+      "--api-url",
+      API,
+      "--media",
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "--max-credits",
+      "30.00",
+    ],
+    { ...io, env: { TLDW_API_TOKEN: "fixture" }, clientFactory: Client },
+  );
+  assert.equal(status, 0);
+  assert.equal(received.maxCredits, "30.00");
+  assert.equal(received.transcription, undefined);
+  assert.equal(received.forceAsr, undefined);
+});
+
+test("CLI forwards deprecated audio compatibility flags and the normal credit ceiling", async () => {
   const io = outputs();
   let received;
   class Client {

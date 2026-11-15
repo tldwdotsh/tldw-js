@@ -87,6 +87,7 @@ const NON_RETRYABLE_CODES = new Set([
   "MAX_CREDITS_EXCEEDED",
   "DURATION_LIMIT_EXCEEDED",
   "TRANSCRIPTION_NOT_ALLOWED",
+  "CAPTIONS_UNAVAILABLE",
   "TRANSCRIPTION_NOT_CONFIGURED",
   "FEATURE_DISABLED",
   "SOURCE_NOT_CONFIGURED",
@@ -514,17 +515,17 @@ async function abortable(promise, signal) {
 
 /**
  * Validate the cost and transcription options shared by submissions and map
- * them to API body fields. Omitted transcription delegates source selection
- * and access policy to the server.
+ * them to API body fields. Processing uses captions or saved source only.
+ * Legacy transcription and forceAsr values are accepted but ignored by the server.
  *
  * @param {object} [options]
- * @param {"auto"|"never"|"if_needed"} [options.transcription] Whether fresh
- *   audio transcription (ASR) may be used. Omit to let the server decide.
+ * @param {"auto"|"never"|"if_needed"} [options.transcription] Deprecated
+ *   compatibility field, accepted but ignored. Fresh audio is unavailable.
  * @param {number|string} [options.maxCredits] Credit ceiling for one job: a
  *   positive decimal up to 1,000,000 with at most two decimal places. It is
  *   sent as a string so no floating-point rounding reaches the server.
- * @param {boolean} [options.forceAsr] Transcribe audio even when captions
- *   exist; requires transcription "if_needed".
+ * @param {boolean} [options.forceAsr] Deprecated compatibility field,
+ *   accepted but ignored. Captions and saved source remain eligible for reuse.
  * @returns {{ transcription?: string, max_credits?: string, force_asr?: boolean }}
  * @throws {TypeError} On any invalid value.
  */
@@ -536,8 +537,6 @@ function spendingOptions({ transcription, maxCredits, forceAsr } = {}) {
     throw new TypeError("transcription must be auto, never or if_needed.");
   if (forceAsr !== undefined && typeof forceAsr !== "boolean")
     throw new TypeError("forceAsr must be a boolean.");
-  if (forceAsr && transcription !== "if_needed")
-    throw new TypeError("forceAsr requires explicit transcription=if_needed.");
   let cap;
   if (maxCredits !== undefined) {
     if (!["number", "string"].includes(typeof maxCredits))
@@ -915,10 +914,11 @@ export class TldwClient {
    * @param {boolean} [options.refreshSource] Fetch current X post or Article
    *   content instead of reusing a snapshot saved within 24 hours. Does not
    *   force audio transcription.
-   * @param {"auto"|"never"|"if_needed"} [options.transcription] Omit to let
-   *   the server decide.
+   * @param {"auto"|"never"|"if_needed"} [options.transcription] Deprecated
+   *   compatibility field, accepted but ignored. Processing uses captions or
+   *   saved source only; fresh audio is unavailable.
    * @param {number|string} [options.maxCredits] Credit ceiling for this job.
-   * @param {boolean} [options.forceAsr] Requires transcription "if_needed".
+   * @param {boolean} [options.forceAsr] Deprecated compatibility field, ignored.
    * @returns {Promise<AnalysisAccepted>} The receipt: `job_id`, the initial
    *   `job`, and polling hints.
    * @throws {TypeError} On invalid arguments (nothing is sent). Passing
