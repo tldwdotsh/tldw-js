@@ -1,4 +1,4 @@
-# tldw.sh agent plugin · 0.9.2
+# tldw.sh agent plugin · 0.9.3
 
 Transcripts and summaries for your agents. Connect to `https://api.tldw.sh/mcp`,
 sign in to tldw.sh in your browser, and approve the requested access. Compatible

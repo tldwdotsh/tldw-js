@@ -423,7 +423,7 @@ export async function checkMcp({ apiUrl, token, fetchImpl = fetch, signal }) {
   const initialized = await rpc(1, "initialize", {
     protocolVersion: protocol,
     capabilities: {},
-    clientInfo: { name: "tldw-cli", version: "0.2.11" },
+    clientInfo: { name: "tldw-cli", version: "0.2.12" },
   });
   if (
     typeof initialized.protocolVersion !== "string" ||

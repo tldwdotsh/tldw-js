@@ -9,14 +9,14 @@
   "sha256": {
     ".agents/plugins/marketplace.json": "f9ea26360f0f4267fb76fe1f5c08549c4d6669faf5e75b4e31049dc34df06c15",
     ".claude-plugin/marketplace.json": "5e8704f714e6d8cbc4e2d22a127e327089cfcc19828ec3a7ac49c26a93b7b18f",
-    ".claude-plugin/plugin.json": "a790d239762a1dc5b6fc91b08f4fe64ecf6c7c71ffcca4f33caf4dadb712e0bd",
-    ".codex-plugin/plugin.json": "5b9aacab0352c2c7492df6e9e325d556a3784cd6891c68130f9ef35b543cbf46",
+    ".claude-plugin/plugin.json": "a965f1faf6d827c14b4607309a51840bb91b2b3291007edd1a94e76cef087423",
+    ".codex-plugin/plugin.json": "daa1d7a1f537ad545529cf3e7d4b1638c76d1776c15693a87644fa4ec0ac3908",
     ".cursor-plugin/marketplace.json": "769c7bc304a8cc60125b76a66d1f7684380a1d54f6ff41a9f4c3dd40143db55a",
-    ".cursor-plugin/plugin.json": "0229b03781b1dffe055e36a9951cc4ca9db618739d3829c81fa0908e77b62a90",
+    ".cursor-plugin/plugin.json": "46f5e1bf42c9790c19b283bfd212d9ac03757e634a207f4a7b67217e5d2ebd3b",
     ".gitignore": "dbf3caac707346a9fc2d11537a977c829a6cf18baa2666e301a1829a557d14ce",
     ".mcp.json": "7c4e61e5a246740fe1acd54460147edcffd9816406f94fc2a78fd4cc19dc8216",
     "LICENSE": "66c5c642314847f06544018eb8224259f5eabf17ed2a5c04c4f28e7f1f684821",
-    "README.md": "1716890afbf735f36cb09ba4160e7349376fe81f665bfba888205c56d2162c97",
+    "README.md": "9406ef46942dc89dd44f7ba0c6b11116a7d084c53387fd78b3e0ae4977a6b858",
     "assets/icon.png": "8f4955863a47f812e2291b3f31793535285837cdf0599530a96085ecb60c2941",
     "codex.mcp.json": "d7f4b4a80f5f3621393c646d6a7f61f662e206ee59e9bc88771e03abd0e61f18",
     "cursor.mcp.json": "d7f4b4a80f5f3621393c646d6a7f61f662e206ee59e9bc88771e03abd0e61f18",
@@ -40,7 +40,7 @@
     "examples/vscode/mcp-config.json": "939fd3781f46fa43a36322d4dbe06a2b8906c7d1412cc7ae81bd361936b43f7f",
     "scripts/validate.py": "e45a9f3bd132278ff5884df484a081da449c9b81044f5a3673c7f3f7484274c9",
     "skills/tldw/LICENSE": "66c5c642314847f06544018eb8224259f5eabf17ed2a5c04c4f28e7f1f684821",
-    "skills/tldw/SKILL.md": "5c6951f2ca0d00fb0aeb8258a473baec4c7687a9c1aaca07645b6d87d3b4abf8",
+    "skills/tldw/SKILL.md": "74bfee0ac0f56aeeccc6fa968a69665b4b98d5ebb909e7766a911d107b89b2ac",
     "skills/tldw/agents/openai.yaml": "1c0dbc071528d5df197b67962263b53fe6dd6289f976717ca4cfe6cb898ce114",
     "skills/tldw/references/errors.md": "572261fe9d3016c59ca520f4cf5a1b7c026714d189d8f1dd00426a2d2ee6a16c",
     "skills/tldw/references/setup.md": "47edddb6b7dd7b77d74e8202c5ce0bbacad67c0930b7469ef0c42fe377e9c066",
@@ -50,5 +50,5 @@
   },
   "skills": 1,
   "valid": true,
-  "version": "0.9.2"
+  "version": "0.9.3"
 }
