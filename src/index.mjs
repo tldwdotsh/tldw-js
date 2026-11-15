@@ -417,7 +417,9 @@ async function readJson(response, signal) {
     }
   } else {
     // Fallback for fetch implementations whose Response has no stream body.
-    text = await response.text();
+    text = signal
+      ? await abortable(response.text(), signal)
+      : await response.text();
     if (Buffer.byteLength(text) > MAX_BODY_BYTES)
       throw new TldwError("API response exceeded the client size limit.", {
         code: "INVALID_RESPONSE",
@@ -682,22 +684,36 @@ export class TldwClient {
       );
       let retry = null;
       try {
-        const response = await this.#fetch(this.apiUrl + path, {
-          method,
-          headers: {
-            Accept: "application/json",
-            ...(this.#token ? { Authorization: `Bearer ${this.#token}` } : {}),
-            ...(body !== undefined
-              ? { "Content-Type": "application/json" }
-              : {}),
-            ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+        const fetching = Promise.resolve(
+          this.#fetch(this.apiUrl + path, {
+            method,
+            headers: {
+              Accept: "application/json",
+              ...(this.#token
+                ? { Authorization: `Bearer ${this.#token}` }
+                : {}),
+              ...(body !== undefined
+                ? { "Content-Type": "application/json" }
+                : {}),
+              ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+            },
+            ...(payload !== undefined ? { body: payload } : {}),
+            signal: controller.signal,
+            // Never follow a redirect; report it instead of retrying it as a network failure.
+            redirect: "manual",
+            cache: "no-store",
+          }),
+        );
+        // A configured fetch can ignore abort; still honor the call's budget
+        // and release a response that arrives after its caller has left.
+        void fetching.then(
+          (value) => {
+            if (controller.signal.aborted && value?.body && !value.body.locked)
+              void value.body.cancel().catch(() => {});
           },
-          ...(payload !== undefined ? { body: payload } : {}),
-          signal: controller.signal,
-          // Never follow a redirect; report it instead of retrying it as a network failure.
-          redirect: "manual",
-          cache: "no-store",
-        });
+          () => {},
+        );
+        const response = await abortable(fetching, controller.signal);
         // Fetch in browsers reports a manual redirect as an opaque response
         // with status 0; Node reports the real 3xx status.
         if (
@@ -711,7 +727,7 @@ export class TldwClient {
         const retryAfterMs = retryDelay(response.headers.get("retry-after"));
         let data;
         try {
-          data = await readJson(response);
+          data = await readJson(response, controller.signal);
         } catch (error) {
           // A proxy's 502/503 page is often HTML: keep retrying it rather
           // than failing on the parse error.

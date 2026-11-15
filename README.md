@@ -8,12 +8,10 @@ A dependency-free client for the asynchronous tldw.sh API. Requires Node.js 20.1
 npm install @tldw/client
 ```
 
-This checkout prepares the **0.2.11 release candidate**. Use the reviewed,
-versioned download on [Connect your agent](https://tldw.sh/agents) for the updated
-extraction helper, X video search, job listing/cancellation and `auto`
-transcription described here. The registry command above installs the currently
-published version; it does not establish that this candidate has been published.
-Publication is a separate release step.
+This documentation describes **0.2.11**: saved transcript extraction, X video
+search, job listing/cancellation and server-selected audio fallback. Reviewed,
+checksum-pinned downloads and current registry availability are listed on
+[Connect your agent](https://tldw.sh/agents).
 Only npm `@tldw/client` is this client.
 
 ## Authenticate

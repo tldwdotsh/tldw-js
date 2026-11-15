@@ -562,6 +562,103 @@ test("one slow poll does not end a longer wait", async () => {
   assert.ok(calls >= 2);
 });
 
+test(
+  "a fetch ignoring abort cannot exceed a submission deadline or lose its replay key",
+  { timeout: 1000 },
+  async () => {
+    let calls = 0;
+    let resolveFetch;
+    let canceled = false;
+    const client = make(
+      () => {
+        calls++;
+        return new Promise((resolve) => {
+          resolveFetch = resolve;
+        });
+      },
+      { requestTimeoutMs: 10 },
+    );
+    await assert.rejects(
+      client.submitAnalysis("source", { idempotencyKey: "same-intent" }),
+      (error) =>
+        error instanceof TldwTimeoutError &&
+        error.idempotencyKey === "same-intent",
+    );
+    assert.equal(calls, 1);
+    resolveFetch(
+      new Response(
+        new ReadableStream({
+          cancel() {
+            canceled = true;
+          },
+        }),
+      ),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(canceled, true);
+  },
+);
+
+test(
+  "a stalled JSON stream and its cancel promise cannot exceed the request deadline",
+  { timeout: 1000 },
+  async () => {
+    let canceled = false;
+    const client = make(
+      async () =>
+        new Response(
+          new ReadableStream({
+            pull() {
+              return new Promise(() => {});
+            },
+            cancel() {
+              canceled = true;
+              return new Promise(() => {});
+            },
+          }),
+        ),
+      { requestTimeoutMs: 10 },
+    );
+    await assert.rejects(client.getUsage(), TldwTimeoutError);
+    assert.equal(canceled, true);
+  },
+);
+
+test(
+  "a JSON text fallback ignoring abort still honors the request deadline",
+  { timeout: 1000 },
+  async () => {
+    const client = make(
+      async () => ({
+        status: 200,
+        ok: true,
+        headers: new Headers(),
+        text: () => new Promise(() => {}),
+      }),
+      { requestTimeoutMs: 10 },
+    );
+    await assert.rejects(client.getUsage(), TldwTimeoutError);
+  },
+);
+
+test(
+  "caller cancellation bounds a fetch ignoring abort without retrying",
+  { timeout: 1000 },
+  async () => {
+    let calls = 0;
+    const client = make(() => {
+      calls++;
+      return new Promise(() => {});
+    });
+    const controller = new AbortController();
+    const reason = new Error("caller stopped");
+    const pending = client.getUsage({ signal: controller.signal });
+    controller.abort(reason);
+    await assert.rejects(pending, (error) => error === reason);
+    assert.equal(calls, 1);
+  },
+);
+
 test("redirects are reported at once and never followed or retried", async () => {
   let calls = 0;
   const client = make(async () => {

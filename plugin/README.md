@@ -1,4 +1,4 @@
-# tldw.sh agent plugin · 0.9.1
+# tldw.sh agent plugin · 0.9.2
 
 Transcripts and summaries for your agents. Connect to `https://api.tldw.sh/mcp`,
 sign in to tldw.sh in your browser, and approve the requested access. Compatible
@@ -13,6 +13,14 @@ The plugin adds reusable instructions around the existing remote MCP tools.
 Media processing stays on tldw.sh. Supported sources include YouTube,
 X posts, threads and Articles, and pasted text. Generic web-article links are
 not supported; paste their text instead.
+
+Hosted discovery searches X videos. The included skill handles YouTube discovery
+with the user's local yt-dlp: installation, a bounded JSON metadata search,
+candidate presentation and selected-link submission. See the
+[YouTube workflow](skills/tldw/references/workflows.md#find-youtube-videos).
+When the agent has filesystem access, it caches receipts, results and source
+pages in workspace `.tldw/` and reuses them for follow-ups. The remote tools
+do not write local files themselves.
 
 ## Marketplace installation
 
@@ -234,7 +242,6 @@ approvals. Read the [Privacy Policy](https://tldw.sh/privacy) and
 ## Account policy and prompts
 
 <!-- generated:tldw-costs -->
-
 Omit `transcription` and `force_asr`; the server decides whether eligible audio fallback is needed after checking saved source and captions. Check `account_usage` before submitting, and respect the user's authorized work and spending ceiling. Developers can override these options through the SDK; agent workflows do not choose them.
 
 The standard processing rate is 1 credit per source minute; fresh audio transcription costs 3 credits per minute. Text uses the live catalog's configured reading rate. Polling, identical idempotent replays and reading saved results do not add processing charges. Read job.credits for estimates, reservations and the final charge.
@@ -244,11 +251,9 @@ Asking again about a saved video is free.
 Agents never change plans or buy anything. When a plan limit blocks work, show `details.upgrade.billing_url` to the account owner; do not open checkout or resubmit automatically.
 
 X video audio can be transcribed when captions are missing on plans and platforms that allow it. The server decides fallback. Visual analysis, dubbing and translated video or subtitle files are not supported.
-
 <!-- /generated:tldw-costs -->
 
 <!-- generated:tldw-prompts -->
-
 - **YouTube research brief** — MCP prompt `youtube_brief`, tool `analyze_media`.
   Instructions: Main argument and three useful takeaways. Cite the minute for each.
   Cost: 1 credit per caption minute. A 20-minute talk is 20 credits. Reading the saved result again is free.
@@ -258,6 +263,6 @@ X video audio can be transcribed when captions are missing on plans and platform
   Cost: Standard credit rates cover both outputs. Reading them again is free.
 
 - **Claims and evidence** — MCP prompt `claims_and_evidence`, tool `analyze_media`.
-Instructions: List practical claims, the evidence, and the caveats. Flag anything supported by one example.
-Cost: Same caption rate. Audio only on the platforms account_usage lists for your plan, at 3 credits a minute.
+  Instructions: List practical claims, the evidence, and the caveats. Flag anything supported by one example.
+  Cost: Same caption rate. Audio only on the platforms account_usage lists for your plan, at 3 credits a minute.
 <!-- /generated:tldw-prompts -->
