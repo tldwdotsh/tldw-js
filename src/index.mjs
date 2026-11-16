@@ -520,12 +520,12 @@ async function abortable(promise, signal) {
 
 /**
  * Validate the cost and transcription options shared by submissions and map
- * them to API body fields. Processing uses captions or saved source only.
+ * them to API body fields. The server reuses source or captions, then enabled audio.
  * Legacy transcription and forceAsr values are accepted but ignored by the server.
  *
  * @param {object} [options]
  * @param {"auto"|"never"|"if_needed"} [options.transcription] Deprecated
- *   compatibility field, accepted but ignored. Fresh audio is unavailable.
+ *   compatibility field, ignored; cannot disable or force automatic audio.
  * @param {number|string} [options.maxCredits] Credit ceiling for one job: a
  *   positive decimal up to 1,000,000 with at most two decimal places. It is
  *   sent as a string so no floating-point rounding reaches the server.
@@ -941,8 +941,8 @@ export class TldwClient {
    *   content instead of reusing a snapshot saved within 24 hours. Does not
    *   force audio transcription.
    * @param {"auto"|"never"|"if_needed"} [options.transcription] Deprecated
-   *   compatibility field, accepted but ignored. Processing uses captions or
-   *   saved source only; fresh audio is unavailable.
+   *   compatibility field, accepted but ignored. Processing reuses saved source or
+   *   captions, then automatic audio when enabled. Cannot disable or force audio.
    * @param {number|string} [options.maxCredits] Credit ceiling for this job.
    * @param {boolean} [options.forceAsr] Deprecated compatibility field, ignored.
    * @returns {Promise<AnalysisAccepted>} The receipt: `job_id`, the initial

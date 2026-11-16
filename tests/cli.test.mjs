@@ -642,7 +642,7 @@ test("CLI never echoes an API token hidden in an explicit key or progress respon
   assert.match(out.lines.err, /REDACTED/);
 });
 
-test("CLI help explains full captions-only processing and ignored legacy flags", async () => {
+test("CLI help explains automatic audio and ignored legacy flags", async () => {
   const io = outputs();
   const status = await runCli(["--help"], {
     ...io,
@@ -652,15 +652,18 @@ test("CLI help explains full captions-only processing and ignored legacy flags",
     },
   });
   assert.equal(status, 0);
-  assert.match(io.lines.out, /Processing uses captions or saved source only/);
-  assert.match(io.lines.out, /fresh audio transcription is unavailable/);
   assert.match(
     io.lines.out,
-    /--transcription and --force-asr are deprecated compatibility flags, accepted but ignored/,
+    /server reuses saved source or captions, then automatic audio when enabled/,
+  );
+  assert.match(io.lines.out, /cannot disable or force audio/);
+  assert.match(
+    io.lines.out,
+    /--transcription and --force-asr are deprecated, ignored flags/,
   );
   assert.match(
     io.lines.out,
-    /--max-credits still caps normal processing credits/,
+    /Automatic audio needs no opt-in or cap; --max-credits still caps processing credits/,
   );
 });
 

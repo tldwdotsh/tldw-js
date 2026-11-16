@@ -48,8 +48,8 @@ export interface JobCredits {
   /** Credits per billable source minute for this job's billing class. */
   rate_multiplier: number | string;
   /**
-   * `standard`: captions, text or a saved transcript. `fresh_asr`: historical
-   * audio transcription jobs. `reask`: a source this account already processed.
+   * `standard`: captions, text or a saved transcript. `fresh_asr`: automatic
+   * audio transcription at the current published rate. `reask`: a source this account already processed.
    */
   billing_class: "standard" | "fresh_asr" | "reask";
   /** Identifier of the pricing rules that priced the job. */
@@ -334,7 +334,8 @@ export interface SubmitOptions {
   signal?: AbortSignal;
   /**
    * @deprecated Compatibility field, accepted but ignored. Processing uses
-   * captions or saved source only; fresh audio transcription is unavailable.
+   * saved source, captions or automatic audio when enabled for the platform.
+   * These legacy fields cannot disable or force audio transcription.
    */
   transcription?: "auto" | "never" | "if_needed";
   /** Decimal credit ceiling for one job. */

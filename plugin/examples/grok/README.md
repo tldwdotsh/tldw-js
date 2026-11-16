@@ -35,8 +35,10 @@ or a command argument. Agent workflows recommend `account:read`, `jobs:write`, `
 First call `account_usage` to check access. Only a user request authorizes a new
 analysis; save its job ID, resume that ID after a disconnect, and retrieve the
 summary and all original-transcript pages after completion. The service uses
-usable saved source or captions; fresh audio transcription is unavailable on
-every plan. Missing captions fail without a processing-credit charge; stop or
+usable saved source or captions first. Where audio processing is enabled for
+the platform, missing usable captions trigger automatic original-audio
+transcription on every plan at 1 credit per minute. Legacy controls cannot
+disable or force audio. An unreadable source fails without a processing-credit charge; stop or
 provide authorized source text instead of resubmitting automatically. Follow
 the canonical skill for source, spending, error and untrusted-content rules.
 

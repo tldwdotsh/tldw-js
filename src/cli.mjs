@@ -71,13 +71,13 @@ wait JOB_ID [--api-url ORIGIN] [--timeout-ms 180000] [--local]
   Resume a durable job. A wait timeout or Ctrl-C does not cancel server work.
 
 The API defaults to https://api.tldw.sh; TLDW_API_URL or --api-url overrides it.
-For private commands, set TLDW_API_TOKEN privately. Processing uses captions or saved source only.
+For private commands, set TLDW_API_TOKEN privately. The server reuses saved source or captions, then automatic audio when enabled.
 Tokens are never accepted as command arguments or saved by this tool.
 --local explicitly permits anonymous HTTP/HTTPS loopback development only.
 Read account usage and the public catalog for current plan allowances and offers.
 Existing Pro subscriptions retain their account limits; Pro has no new checkout.
-Captions/text or cached transcripts cost 1 credit/minute; fresh audio transcription is unavailable.
---transcription and --force-asr are deprecated compatibility flags, accepted but ignored by the server. --max-credits still caps normal processing credits.
+Video captions, cached transcripts and automatic audio cost 1 credit/minute. Text uses the published reading-length rate.
+--transcription and --force-asr are deprecated, ignored flags; they cannot disable or force audio. Automatic audio needs no opt-in or cap; --max-credits still caps processing credits.
 Included credits reset monthly. Manage purchases and subscriptions in Billing.
 Re-asking a saved source is free; refreshing a source can use credits.
 X post and X Article sources may reuse a saved snapshot for 24 hours; --refresh-source fetches current content without forcing ASR.
@@ -426,7 +426,7 @@ export async function checkMcp({ apiUrl, token, fetchImpl = fetch, signal }) {
   const initialized = await rpc(1, "initialize", {
     protocolVersion: protocol,
     capabilities: {},
-    clientInfo: { name: "tldw-cli", version: "0.2.14" },
+    clientInfo: { name: "tldw-cli", version: "0.2.15" },
   });
   if (
     typeof initialized.protocolVersion !== "string" ||

@@ -8,8 +8,8 @@ A dependency-free client for the asynchronous tldw.sh API. Requires Node.js 20.1
 npm install @tldw/client
 ```
 
-This documentation describes **0.2.14**: saved transcript extraction, X video
-search, job listing/cancellation and captions-only processing. Reviewed,
+This documentation describes **0.2.15**: saved transcript extraction, X video
+search, job listing/cancellation and automatic audio fallback. Reviewed,
 checksum-pinned downloads and current registry availability are listed on
 [Connect your agent](https://tldw.sh/agents).
 Only npm `@tldw/client` is this client.
@@ -80,11 +80,13 @@ const result = await client.analyze("https://x.com/USER/status/POST_ID", {
 console.log(result.job.id, result.summary.content);
 ```
 
-Processing uses accessible captions or saved source, including previously settled
-audio transcripts. Fresh audio transcription is unavailable. `transcription`
+Processing reuses saved source or usable captions. When audio transcription is
+enabled for the platform, videos without usable captions are transcribed
+automatically on every plan at the same 1 credit per minute. `transcription`
 (`"auto"`, `"never"`, `"if_needed"`) and `forceAsr` are deprecated compatibility
-fields: accepted but ignored, without bypassing captions or saved-source reuse.
-`CAPTIONS_UNAVAILABLE` is a nonretryable failure when neither is available; the
+fields: accepted but ignored. They cannot disable or force audio transcription.
+`CAPTIONS_UNAVAILABLE` is a nonretryable failure when no usable source exists and
+automatic audio is disabled for the platform; the
 failed job releases its hold without a processing-credit charge. A blocked or
 transient retrieval failure retains its own error. `maxCredits` still sets a positive
 decimal credit ceiling with at most two decimal places. The server enforces
@@ -227,8 +229,9 @@ Account, quota and configuration refusals are returned immediately, including
 `SPEND_LIMIT_REACHED` with HTTP 503. Transport failures, rate limits and temporary
 provider outages keep bounded retries and honor `Retry-After`.
 
-Captions/text and saved source cost 1 credit per media minute. Fresh audio
-transcription is unavailable.
+Captions, saved source and automatic audio cost 1 credit per billable source
+minute. Text uses the published reading-length rate. Audio fallback needs no
+opt-in or spending cap; an optional cap remains enforced.
 A new analysis is free only when the account-scoped re-ask policy covers the
 instructions and this account has a usable source from a completed job.
 `rates.reask=0` alone may cover only identical instructions. Refreshing a source
