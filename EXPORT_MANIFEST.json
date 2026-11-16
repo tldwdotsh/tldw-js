@@ -1,7 +1,7 @@
 {
   "automatic_registry_publication": false,
   "canonical_directory": "packages/agent-client-js",
-  "canonical_source_commit": "33eb79b9972e12b37483a22a5e052e7c2871899c",
+  "canonical_source_commit": "89f3700c358476789cf52237344c87b74f4d9efa",
   "canonical_source_snapshot_sha256": "d51bdc0ce72888ce7e67de5444b2b1c03f6b6872a6aba43d5087485e92c6bdb7",
   "export_files": {
     ".gitignore": "427249912cc347340b2cff8e7a6c6daae0077b16be21d8c7306752386c4a0186",
