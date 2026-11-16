@@ -105,6 +105,11 @@ const JOB_EVENTS = new Set([
   "canceled",
 ]);
 const MEDIA_TYPES = new Set(["auto", "text", "url", "youtube", "x"]);
+const PUBLIC_READ_PATHS = new Set([
+  "/v1/public/config",
+  "/v1/public/security",
+  "/v1/billing/catalog",
+]);
 
 /** Production API origin, used when neither `apiUrl` nor TLDW_API_URL is set. */
 export const DEFAULT_API_URL = "https://api.tldw.sh";
@@ -581,6 +586,7 @@ function spendingOptions({ transcription, maxCredits, forceAsr } = {}) {
 export class TldwClient {
   #token;
   #fetch;
+  #publicOnly;
   // First-poll guidance per accepted resource, keyed "kind:id": the earliest
   // time to poll (notBefore) and the minimum spacing between polls (interval).
   #pollHints = new Map();
@@ -589,9 +595,11 @@ export class TldwClient {
    * @param {string} [options.apiUrl] API origin; defaults to TLDW_API_URL,
    *   then https://api.tldw.sh. Validated by {@link validateApiUrl}.
    * @param {string} [options.token] Scoped API key, sent as a Bearer token.
-   *   Required unless `allowAnonymous` is set for a loopback origin.
+   *   Required unless publicOnly is true or allowAnonymous is set for loopback.
    * @param {boolean} [options.allowAnonymous=false] Allow requests without a
    *   token; only takes effect on a loopback (local development) origin.
+   * @param {boolean} [options.publicOnly=false] No-key client limited to the three
+   *   public metadata GETs. Rejects tokens and every private operation.
    * @param {typeof fetch} [options.fetch] Fetch implementation, for example a
    *   test double; defaults to the global fetch.
    * @param {number} [options.requestTimeoutMs=30000] Budget in milliseconds
@@ -603,11 +611,16 @@ export class TldwClient {
     apiUrl = defaultApiUrl(),
     token,
     allowAnonymous = false,
+    publicOnly = false,
     fetch: fetcher = globalThis.fetch,
     requestTimeoutMs = 30_000,
   } = {}) {
     const { origin, loopback } = validateApiUrl(apiUrl);
-    if (!token && !(allowAnonymous && loopback))
+    if (typeof publicOnly !== "boolean")
+      throw new TypeError("publicOnly must be a boolean.");
+    if (publicOnly && token !== undefined)
+      throw new TypeError("publicOnly clients do not accept a token.");
+    if (!token && !publicOnly && !(allowAnonymous && loopback))
       throw new TypeError(
         "A tldw API token is required. Anonymous access is only available with explicit loopback development access.",
       );
@@ -628,6 +641,17 @@ export class TldwClient {
     });
     this.#token = token;
     this.#fetch = fetcher;
+    this.#publicOnly = publicOnly;
+  }
+  #requireOperation(method, path, body) {
+    if (
+      this.#publicOnly &&
+      (method !== "GET" || !PUBLIC_READ_PATHS.has(path) || body !== undefined)
+    )
+      throw new TldwError(
+        "This public-only client cannot call private API operations. Create an authenticated client for account data or processing.",
+        { code: "PUBLIC_READ_ONLY" },
+      );
   }
   /**
    * Send one API request with bounded retries and return the parsed body.
@@ -659,6 +683,7 @@ export class TldwClient {
     path,
     { body, signal, idempotencyKey, deadline } = {},
   ) {
+    this.#requireOperation(method, path, body);
     // Paths are constructed exclusively from validated UUIDs; server-supplied URLs are never followed.
     const operationDeadline = deadline ?? Date.now() + this.requestTimeoutMs;
     // Serialize once: every retry must send byte-identical content.
@@ -701,6 +726,7 @@ export class TldwClient {
             // Never follow a redirect; report it instead of retrying it as a network failure.
             redirect: "manual",
             cache: "no-store",
+            ...(this.#publicOnly ? { credentials: "omit" } : {}),
           }),
         );
         // A configured fetch can ignore abort; still honor the call's budget
@@ -1082,6 +1108,7 @@ export class TldwClient {
    */
   streamJobEvents(id, { signal, timeoutMs = this.requestTimeoutMs } = {}) {
     id = identifier(id);
+    this.#requireOperation("GET", `/v1/jobs/${id}/events`);
     integer(timeoutMs, "timeoutMs", 1, 610_000);
     const state = { controller: new AbortController(), closing: false };
     const iterator = this.#jobEvents(id, signal, timeoutMs, state);
@@ -1462,6 +1489,27 @@ export class TldwClient {
       throw new TldwError("API returned an invalid summary.", {
         code: "INVALID_RESPONSE",
       });
+    return data;
+  }
+  /** Read current public feature/configuration metadata; starts no processing. */
+  async getPublicConfig({ signal } = {}) {
+    const { data } = await this.#request("GET", "/v1/public/config", {
+      signal,
+    });
+    return data;
+  }
+  /** Read current public enrollment/verification and Free allowance policy. */
+  async getPublicSecurity({ signal } = {}) {
+    const { data } = await this.#request("GET", "/v1/public/security", {
+      signal,
+    });
+    return data;
+  }
+  /** Read the public plan/credit catalog, including published prices and offers. */
+  async getBillingCatalog({ signal } = {}) {
+    const { data } = await this.#request("GET", "/v1/billing/catalog", {
+      signal,
+    });
     return data;
   }
   /**

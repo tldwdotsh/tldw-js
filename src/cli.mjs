@@ -40,6 +40,9 @@ const HELP = `tldw — connect agents to the tldw.sh API
 
 init [--api-url ORIGIN] [--web-url ORIGIN] [--dir ./tldw-agent-plugin]
   Prepare a new configured plugin directory. Never writes a key or global settings.
+public-config | public-security | billing-catalog [--api-url ORIGIN] [--local]
+  Read public configuration, verification/Free policy or plan prices as JSON without a key.
+  These commands never send TLDW_API_TOKEN, submit processing or access account data.
 doctor [--api-url ORIGIN] [--local]
   Check API-key REST/MCP access with TLDW_API_TOKEN without creating a job.
   Browser OAuth sessions in other clients are separate from this CLI.
@@ -68,7 +71,7 @@ wait JOB_ID [--api-url ORIGIN] [--timeout-ms 180000] [--local]
   Resume a durable job. A wait timeout or Ctrl-C does not cancel server work.
 
 The API defaults to https://api.tldw.sh; TLDW_API_URL or --api-url overrides it.
-Set TLDW_API_TOKEN privately. Processing uses captions or saved source only.
+For private commands, set TLDW_API_TOKEN privately. Processing uses captions or saved source only.
 Tokens are never accepted as command arguments or saved by this tool.
 --local explicitly permits anonymous HTTP/HTTPS loopback development only.
 Read account usage and the public catalog for current plan allowances and offers.
@@ -423,7 +426,7 @@ export async function checkMcp({ apiUrl, token, fetchImpl = fetch, signal }) {
   const initialized = await rpc(1, "initialize", {
     protocolVersion: protocol,
     capabilities: {},
-    clientInfo: { name: "tldw-cli", version: "0.2.13" },
+    clientInfo: { name: "tldw-cli", version: "0.2.14" },
   });
   if (
     typeof initialized.protocolVersion !== "string" ||
@@ -534,6 +537,9 @@ export async function runCli(
       ![
         "init",
         "doctor",
+        "public-config",
+        "public-security",
+        "billing-catalog",
         "search",
         "analyze",
         "extract",
@@ -543,7 +549,7 @@ export async function runCli(
     )
       throw new SetupError(
         "INVALID_ARGUMENT",
-        "Choose init, doctor, search, analyze, extract, transcript or wait. Run tldw --help.",
+        "Choose init, doctor, public-config, public-security, billing-catalog, search, analyze, extract, transcript or wait. Run tldw --help.",
       );
     // --api-url wins over TLDW_API_URL, which wins over the default.
     const origin = validateOrigin(
@@ -578,9 +584,14 @@ export async function runCli(
       stdout.write(JSON.stringify(result, null, 2) + "\n");
       return 0;
     }
+    const publicRead = [
+      "public-config",
+      "public-security",
+      "billing-catalog",
+    ].includes(command);
     // Options each remaining command accepts.
     const allowed =
-      command === "doctor"
+      command === "doctor" || publicRead
         ? ["api-url", "local"]
         : command === "wait"
           ? ["api-url", "local", "timeout-ms"]
@@ -637,8 +648,8 @@ export async function runCli(
         "Use offset 0-1000000000 and limit 1-500.",
       );
     // --local never sends the token, even when one is set.
-    token = options.local ? undefined : env.TLDW_API_TOKEN;
-    if (!token && !options.local)
+    token = options.local || publicRead ? undefined : env.TLDW_API_TOKEN;
+    if (!token && !options.local && !publicRead)
       throw new SetupError(
         "TOKEN_REQUIRED",
         "Set TLDW_API_TOKEN privately, or use --local for explicitly enabled anonymous loopback development.",
@@ -653,6 +664,7 @@ export async function runCli(
       apiUrl: origin,
       token,
       allowAnonymous: !!options.local,
+      ...(publicRead ? { publicOnly: true } : {}),
       // Print the idempotency key immediately before the first POST: an accepted
       // request whose reply is lost stays replayable, and a request rejected by
       // local validation never prints a key for a submission that was not sent.
@@ -664,6 +676,17 @@ export async function runCli(
         return fetchImpl(url, init);
       },
     });
+    if (publicRead) {
+      const method = {
+        "public-config": "getPublicConfig",
+        "public-security": "getPublicSecurity",
+        "billing-catalog": "getBillingCatalog",
+      }[command];
+      stdout.write(
+        JSON.stringify(await client[method]({ signal }), null, 2) + "\n",
+      );
+      return 0;
+    }
     if (command === "doctor") {
       let account;
       try {

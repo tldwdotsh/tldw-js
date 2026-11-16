@@ -382,11 +382,13 @@ export interface ClientOptions {
   apiUrl?: string;
   /**
    * Scoped tldw API key, sent as a Bearer token and never exposed as a
-   * property. Required unless `allowAnonymous` is set on a loopback origin.
+   * property. Required unless publicOnly is true or allowAnonymous is set on loopback.
    */
   token?: string;
   /** Allow token-less requests; only effective on a loopback development origin. */
   allowAnonymous?: boolean;
+  /** Explicit no-key mode limited to the three public metadata reads. Rejects tokens and private operations. */
+  publicOnly?: boolean;
   /** Fetch implementation (for example a test double); defaults to global fetch. */
   fetch?: typeof globalThis.fetch;
   /** Budget in ms for one API call including retries, 1 to 120000 (default 30000). */
@@ -409,7 +411,7 @@ export class TldwError extends Error {
   /**
    * The API's error code (for example QUOTA_EXCEEDED or RATE_LIMITED), or a
    * client code: CLIENT_ERROR, HTTP_ERROR, INVALID_RESPONSE, NETWORK_ERROR,
-   * WAIT_TIMEOUT, JOB_FAILED or CANCELED.
+   * WAIT_TIMEOUT, JOB_FAILED, CANCELED or PUBLIC_READ_ONLY.
    */
   code: string;
   /** HTTP status, or null when no response was received. */
@@ -575,6 +577,18 @@ export class TldwClient {
     read?: boolean,
     options?: { signal?: AbortSignal },
   ): Promise<TranscriptReadResult>;
+  /** Read public runtime feature/configuration metadata without starting processing. */
+  getPublicConfig(options?: {
+    signal?: AbortSignal;
+  }): Promise<Record<string, unknown>>;
+  /** Read public enrollment/verification and Free allowance policy. */
+  getPublicSecurity(options?: {
+    signal?: AbortSignal;
+  }): Promise<Record<string, unknown>>;
+  /** Read public plan/credit catalog including published prices and offers. */
+  getBillingCatalog(options?: {
+    signal?: AbortSignal;
+  }): Promise<Record<string, unknown>>;
   /** Read plan, credit usage and limits (GET /v1/me). Requires account:read. */
   getUsage(options?: {
     signal?: AbortSignal;

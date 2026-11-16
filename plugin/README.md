@@ -1,4 +1,4 @@
-# tldw.sh agent plugin · 0.9.4
+# tldw.sh agent plugin · 0.9.5
 
 Transcripts and summaries for your agents. Connect to `https://api.tldw.sh/mcp`,
 sign in to tldw.sh in your browser, and approve the requested access. Compatible
@@ -193,13 +193,19 @@ before submission. The native names stay `tldw`.
 
 Discover the MCP tools, then call `account_usage`. For a key without
 `account:read`, use `list_jobs`. Do not submit paid work just to test setup.
-The read-only tools are `account_usage`, `list_jobs`, `get_job`, `wait_job`,
+The read-only tools are `public_config`, `public_security`, `billing_catalog`,
+`account_usage`, `list_jobs`, `get_job`, `wait_job`,
 `get_summary`, `get_transcript`, `list_transcripts` and `get_saved_transcript`.
 Keep approval enabled for processing, `search_videos`, cancellation and other
 state-changing tools.
 A successful connection check does not verify provider processing or payments.
 
-The customer surface has 12 MCP tools and three prompts. `search_videos` finds
+The customer surface has 15 MCP tools and three prompts. Public metadata tools
+provide service identity, activation-policy and catalog facts when needed for
+setup. They need an authenticated MCP connection without additional scopes;
+they do not read an account's balance or start checkout. Call `account_usage`
+before processing for the connected account's actual credits and limits.
+`search_videos` finds
 X posts with video and uses one of the plan's monthly searches, including empty
 successful results. Provider failures and saved replays do not use another search.
 The same query and sort can replay for 15 minutes; `account_usage` and the search

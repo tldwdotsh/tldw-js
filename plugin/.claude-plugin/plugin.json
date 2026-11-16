@@ -1,13 +1,20 @@
 {
   "name": "tldw",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "Analyze YouTube links, public X posts and Articles, and text with a custom brief; submit durable jobs and retrieve cited output through tldw.sh.",
   "author": {
     "name": "tldw.sh",
     "email": "support@tldw.sh"
   },
   "license": "MIT",
-  "keywords": ["media", "summaries", "analysis", "transcripts", "mcp", "tldw"],
+  "keywords": [
+    "media",
+    "summaries",
+    "analysis",
+    "transcripts",
+    "mcp",
+    "tldw"
+  ],
   "homepage": "https://tldw.sh/agents",
   "icon": "./assets/icon.png",
   "documentationUrl": "https://tldw.sh/docs",
